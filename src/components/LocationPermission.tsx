@@ -57,6 +57,7 @@ const LocationPermission = ({ onLocationGranted }: LocationPermissionProps) => {
     }
   };
 
+  // Fixed the comparison by using strict equality and checking against the string value
   if (permissionStatus === 'granted') {
     return null;
   }
