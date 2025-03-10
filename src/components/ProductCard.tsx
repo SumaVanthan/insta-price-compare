@@ -4,9 +4,9 @@ import { motion } from 'framer-motion';
 import PriceComparison from './PriceComparison';
 
 export interface ProductPrices {
-  zepto?: { price: string; unit: string };
-  blinkit?: { price: string; unit: string };
-  instamart?: { price: string; unit: string };
+  zepto?: { price: string; unit: string; url?: string };
+  blinkit?: { price: string; unit: string; url?: string };
+  instamart?: { price: string; unit: string; url?: string };
 }
 
 export interface ProductData {

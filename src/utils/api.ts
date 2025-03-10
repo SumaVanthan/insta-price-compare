@@ -23,9 +23,21 @@ export const searchProducts = async (
       name: 'Amul Taaza Toned Milk',
       imageUrl: 'https://m.media-amazon.com/images/I/61DrvR8ARIL._AC_UF1000,1000_QL80_.jpg',
       prices: {
-        zepto: { price: '₹30', unit: '500ml' },
-        blinkit: { price: '₹32', unit: '500ml' },
-        instamart: { price: '₹31', unit: '500ml' },
+        zepto: { 
+          price: '₹30', 
+          unit: '500ml',
+          url: 'https://www.zeptonow.com/product/amul-taaza-toned-milk/prid/10005822'
+        },
+        blinkit: { 
+          price: '₹32', 
+          unit: '500ml',
+          url: 'https://blinkit.com/prn/amul-taaza-toned-milk/prid/10889'
+        },
+        instamart: { 
+          price: '₹31', 
+          unit: '500ml',
+          url: 'https://www.swiggy.com/instamart-item/amul-taaza-homogenised-toned-milk-514450'
+        },
       },
       unit: '500ml'
     },
@@ -34,8 +46,16 @@ export const searchProducts = async (
       name: 'Arokya Full Cream Milk',
       imageUrl: 'https://drstores.in/wp-content/uploads/2022/04/Arokya-Full-Cream-Milk.jpeg',
       prices: {
-        zepto: { price: '₹40', unit: '500ml' },
-        instamart: { price: '₹38', unit: '500ml' },
+        zepto: { 
+          price: '₹40', 
+          unit: '500ml',
+          url: 'https://www.zeptonow.com/product/arokya-full-cream-milk/prid/8542365'
+        },
+        instamart: { 
+          price: '₹38', 
+          unit: '500ml',
+          url: 'https://www.swiggy.com/instamart-item/arokya-full-cream-milk-245986'
+        },
       },
       unit: '500ml'
     },
@@ -44,9 +64,21 @@ export const searchProducts = async (
       name: 'Fortune Sunflower Oil',
       imageUrl: 'https://happyfoods.in/wp-content/uploads/2022/06/Fortune-Sun-Lite-Refined-Sunflower-Oil-1L-2.jpg',
       prices: {
-        blinkit: { price: '₹140', unit: '1L' },
-        zepto: { price: '₹142', unit: '1L' },
-        instamart: { price: '₹138', unit: '1L' },
+        blinkit: { 
+          price: '₹140', 
+          unit: '1L',
+          url: 'https://blinkit.com/prn/fortune-sunlite-refined-sunflower-oil/prid/5462'
+        },
+        zepto: { 
+          price: '₹142', 
+          unit: '1L',
+          url: 'https://www.zeptonow.com/product/fortune-sunlite-refined-sunflower-oil/prid/2594'
+        },
+        instamart: { 
+          price: '₹138', 
+          unit: '1L',
+          url: 'https://www.swiggy.com/instamart-item/fortune-sunlite-refined-sunflower-oil-244972'
+        },
       },
       unit: '1L'
     },
@@ -55,9 +87,21 @@ export const searchProducts = async (
       name: 'Tata Salt',
       imageUrl: 'https://m.media-amazon.com/images/I/71cPvJuLRvL.jpg',
       prices: {
-        zepto: { price: '₹22', unit: '1kg' },
-        blinkit: { price: '₹23', unit: '1kg' },
-        instamart: { price: '₹22', unit: '1kg' },
+        zepto: { 
+          price: '₹22', 
+          unit: '1kg',
+          url: 'https://www.zeptonow.com/product/tata-salt/prid/2365'
+        },
+        blinkit: { 
+          price: '₹23', 
+          unit: '1kg',
+          url: 'https://blinkit.com/prn/tata-salt-iodized/prid/9283'
+        },
+        instamart: { 
+          price: '₹22', 
+          unit: '1kg',
+          url: 'https://www.swiggy.com/instamart-item/tata-salt-243567'
+        },
       },
       unit: '1kg'
     },
@@ -66,9 +110,21 @@ export const searchProducts = async (
       name: 'Maggi 2-Minute Noodles',
       imageUrl: 'https://m.media-amazon.com/images/I/71a6O4hWgJL.jpg',
       prices: {
-        zepto: { price: '₹14', unit: '70g' },
-        blinkit: { price: '₹12', unit: '70g' },
-        instamart: { price: '₹13', unit: '70g' },
+        zepto: { 
+          price: '₹14', 
+          unit: '70g',
+          url: 'https://www.zeptonow.com/product/maggi-2-minute-masala-noodles/prid/1254'
+        },
+        blinkit: { 
+          price: '₹12', 
+          unit: '70g',
+          url: 'https://blinkit.com/prn/maggi-2-minute-masala-instant-noodles/prid/97'
+        },
+        instamart: { 
+          price: '₹13', 
+          unit: '70g',
+          url: 'https://www.swiggy.com/instamart-item/maggi-2-minute-masala-instant-noodles-243821'
+        },
       },
       unit: '70g'
     },
@@ -77,8 +133,16 @@ export const searchProducts = async (
       name: 'Britannia Good Day Cookies',
       imageUrl: 'https://dcsclprodfe01.blob.core.windows.net/images/ProductMicrosite/Britannia/GoodDayButter/good-day-butter-front.svg',
       prices: {
-        blinkit: { price: '₹30', unit: '200g' },
-        instamart: { price: '₹32', unit: '200g' },
+        blinkit: { 
+          price: '₹30', 
+          unit: '200g',
+          url: 'https://blinkit.com/prn/britannia-good-day-butter-cookies/prid/5386'
+        },
+        instamart: { 
+          price: '₹32', 
+          unit: '200g',
+          url: 'https://www.swiggy.com/instamart-item/britannia-good-day-butter-cookies-243681'
+        },
       },
       unit: '200g'
     },
@@ -105,9 +169,21 @@ export const scrapeProductPrices = async (productId: string, location: { latitud
   // Mock implementation
   return {
     prices: {
-      zepto: { price: '₹99', unit: '1 unit' },
-      blinkit: { price: '₹95', unit: '1 unit' },
-      instamart: { price: '₹97', unit: '1 unit' },
+      zepto: { 
+        price: '₹99', 
+        unit: '1 unit',
+        url: 'https://www.zeptonow.com/product/sample-product/prid/12345'
+      },
+      blinkit: { 
+        price: '₹95', 
+        unit: '1 unit',
+        url: 'https://blinkit.com/prn/sample-product/prid/54321'
+      },
+      instamart: { 
+        price: '₹97', 
+        unit: '1 unit',
+        url: 'https://www.swiggy.com/instamart-item/sample-product-123456'
+      },
     }
   };
 };
