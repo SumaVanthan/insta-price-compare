@@ -10,6 +10,7 @@ interface LocationPermissionProps {
 }
 
 const LocationPermission = ({ onLocationGranted }: LocationPermissionProps) => {
+  // Update the type definition to include 'granted'
   const [permissionStatus, setPermissionStatus] = useState<'prompt' | 'granted' | 'denied' | 'requesting'>('prompt');
   const { toast } = useToast();
 
@@ -57,7 +58,6 @@ const LocationPermission = ({ onLocationGranted }: LocationPermissionProps) => {
     }
   };
 
-  // Fixed the comparison by using strict equality and checking against the string value
   if (permissionStatus === 'granted') {
     return null;
   }
