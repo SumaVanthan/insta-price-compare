@@ -2,6 +2,7 @@
 import React from 'react';
 import { ExternalLink } from 'lucide-react';
 import { ProductPrices } from './ProductCard';
+import { extractPrice } from '@/utils/string_similarity';
 
 interface PriceComparisonProps {
   prices: ProductPrices;
@@ -41,13 +42,7 @@ const PriceComparison = ({ prices }: PriceComparisonProps) => {
     .filter(([_, details]) => details?.price && !details.price.includes('Click to view') && !details.price.includes('Live Price'))
     .map(([platform, details]) => {
       // Extract the numeric price
-      let numericPrice = 0;
-      if (details.price) {
-        const priceMatch = details.price.match(/\d+(\.\d+)?/);
-        if (priceMatch) {
-          numericPrice = parseFloat(priceMatch[0]);
-        }
-      }
+      const numericPrice = extractPrice(details.price) || 0;
       
       return {
         platform,
@@ -64,10 +59,7 @@ const PriceComparison = ({ prices }: PriceComparisonProps) => {
     
     try {
       // Extract the numeric price
-      const priceMatch = price.price.match(/\d+(\.\d+)?/);
-      if (!priceMatch) return false;
-      
-      const numericPrice = parseFloat(priceMatch[0]);
+      const numericPrice = extractPrice(price.price) || 0;
       return numericPrice === lowestPrice && lowestPrice > 0;
     } catch {
       return false;

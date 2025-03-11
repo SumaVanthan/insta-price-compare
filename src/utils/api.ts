@@ -1,6 +1,6 @@
 
 import { ProductData } from '@/components/ProductCard';
-import { string_similarity } from './string_similarity';
+import { string_similarity, extractPrice } from './string_similarity';
 
 interface ScrapedResult {
   name: string;
@@ -8,6 +8,7 @@ interface ScrapedResult {
   imageUrl: string;
   unit: string;
   url: string;
+  numericPrice?: number;
 }
 
 // Function to scrape product data from multiple platforms
@@ -39,12 +40,17 @@ export const searchProducts = async (
 };
 
 async function fetchWithCorsProxy(url: string): Promise<string> {
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-  const response = await fetch(proxyUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch from ${url}`);
+  try {
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch from ${url}`);
+    }
+    return await response.text();
+  } catch (error) {
+    console.error(`Error fetching with CORS proxy: ${url}`, error);
+    throw error;
   }
-  return await response.text();
 }
 
 async function scrapeZeptoProducts(query: string): Promise<ScrapedResult[]> {
@@ -70,8 +76,13 @@ async function scrapeZeptoProducts(query: string): Promise<ScrapedResult[]> {
           const img = imageContainer.querySelector('img');
           if (img) {
             // Try to get srcset or src
-            imageUrl = img.getAttribute('srcset')?.split(' ')[0] || 
-                      img.getAttribute('src') || '';
+            const srcset = img.getAttribute('srcset');
+            if (srcset) {
+              // Extract the first URL from srcset
+              imageUrl = srcset.split(' ')[0];
+            } else {
+              imageUrl = img.getAttribute('src') || '';
+            }
           }
         }
         
@@ -94,12 +105,14 @@ async function scrapeZeptoProducts(query: string): Promise<ScrapedResult[]> {
           searchUrl;
         
         if (name && price) {
+          const numericPrice = extractPrice(price);
           products.push({
             name,
             price,
             imageUrl,
             unit,
-            url: productUrl
+            url: productUrl,
+            numericPrice: numericPrice || undefined
           });
         }
       } catch (err) {
@@ -155,12 +168,14 @@ async function scrapeBlinkitProducts(query: string): Promise<ScrapedResult[]> {
           searchUrl;
         
         if (name && price) {
+          const numericPrice = extractPrice(price);
           products.push({
             name,
             price,
             imageUrl,
             unit,
-            url: productUrl
+            url: productUrl,
+            numericPrice: numericPrice || undefined
           });
         }
       } catch (err) {
@@ -185,30 +200,33 @@ async function scrapeInstamartProducts(query: string): Promise<ScrapedResult[]> 
     
     const products: ScrapedResult[] = [];
     
-    // Find product containers
-    const productCards = doc.querySelectorAll('.sc-dcJsrY');
+    // Find product containers - updated selector based on the class provided
+    const productCards = Array.from(doc.querySelectorAll('.sc-dcJsrY') || []);
     
     productCards.forEach(card => {
       try {
-        // Extract image
+        // Extract image - updated selector based on the class provided
         const imageElement = card.querySelector('.sc-dcJsrY.ibghhT._1NxA5 img');
         let imageUrl = '';
         if (imageElement) {
           imageUrl = imageElement.getAttribute('src') || '';
         }
         
-        // Extract name
+        // Extract name - updated selector based on the class provided
         const nameElement = card.querySelector('.sc-aXZVg.kyEzVU._1sPB0');
         const name = nameElement ? nameElement.textContent?.trim() || '' : '';
         
-        // Extract quantity
+        // Extract quantity - updated selector based on the class provided
         const quantityElement = card.querySelector('.sc-aXZVg.entQHA._3eIPt');
         const unit = quantityElement ? quantityElement.textContent?.trim() || '' : '';
         
-        // Extract price
+        // Extract price - updated selector based on the class provided
         const priceElement = card.querySelector('.sc-aXZVg.jLtxeJ.JZGfZ');
-        const price = priceElement ? 
-          priceElement.getAttribute('aria-label') || priceElement.textContent?.trim() || '' : '';
+        let price = '';
+        if (priceElement) {
+          // Try to get price from aria-label first, then fallback to text content
+          price = priceElement.getAttribute('aria-label') || priceElement.textContent?.trim() || '';
+        }
         
         // Extract product URL
         const linkElement = card.closest('a');
@@ -217,12 +235,14 @@ async function scrapeInstamartProducts(query: string): Promise<ScrapedResult[]> 
           searchUrl;
         
         if (name && price) {
+          const numericPrice = extractPrice(price);
           products.push({
             name,
             price,
             imageUrl,
             unit,
-            url: productUrl
+            url: productUrl,
+            numericPrice: numericPrice || undefined
           });
         }
       } catch (err) {
@@ -245,109 +265,56 @@ function mergeProducts(
 ): ProductData[] {
   const mergedProducts: ProductData[] = [];
   const processedProducts = new Set<string>();
+  const similarityThreshold = 0.8; // 80% name similarity to consider products the same
   
-  // Process all Zepto products first
-  zeptoProducts.forEach((zeptoProduct, index) => {
-    const productId = `product-${index}`;
-    
-    // Find matching products in other platforms
-    const blinkitMatch = findMatchingProduct(zeptoProduct.name, blinkitProducts);
-    const instamartMatch = findMatchingProduct(zeptoProduct.name, instamartProducts);
-    
-    // Create product data with prices from all platforms
-    const productData: ProductData = {
-      id: productId,
-      name: zeptoProduct.name,
-      imageUrl: zeptoProduct.imageUrl || '/placeholder.svg',
-      prices: {
-        zepto: { 
-          price: zeptoProduct.price, 
-          unit: zeptoProduct.unit,
-          url: zeptoProduct.url
-        }
-      },
-      unit: zeptoProduct.unit
-    };
-    
-    // Add Blinkit price if matched
-    if (blinkitMatch) {
-      productData.prices.blinkit = {
-        price: blinkitMatch.price,
-        unit: blinkitMatch.unit,
-        url: blinkitMatch.url
-      };
-      processedProducts.add(blinkitMatch.name);
+  // Create a master list of all products
+  const allProducts: Array<ScrapedResult & { source: string }> = [
+    ...zeptoProducts.map(p => ({ ...p, source: 'zepto' })),
+    ...blinkitProducts.map(p => ({ ...p, source: 'blinkit' })),
+    ...instamartProducts.map(p => ({ ...p, source: 'instamart' }))
+  ];
+  
+  // Sort products by name for more deterministic grouping
+  allProducts.sort((a, b) => a.name.localeCompare(b.name));
+  
+  // For each product, find similar products across platforms
+  for (const product of allProducts) {
+    // Skip if this product name has been processed
+    if (isProductProcessed(product.name, processedProducts)) {
+      continue;
     }
     
-    // Add Instamart price if matched
-    if (instamartMatch) {
-      productData.prices.instamart = {
-        price: instamartMatch.price,
-        unit: instamartMatch.unit,
-        url: instamartMatch.url
+    // Find all similar products across all platforms
+    const similarProducts = allProducts.filter(p => 
+      !isProductProcessed(p.name, processedProducts) && 
+      (p === product || string_similarity(p.name.toLowerCase(), product.name.toLowerCase()) >= similarityThreshold)
+    );
+    
+    // Create a merged product data object
+    const productData: ProductData = {
+      id: `product-${mergedProducts.length}`,
+      name: product.name, // Use the first product's name
+      imageUrl: product.imageUrl || '/placeholder.svg',
+      prices: {},
+      unit: product.unit // Use the first product's unit
+    };
+    
+    // Add prices from each platform
+    for (const similarProduct of similarProducts) {
+      const platform = similarProduct.source as keyof ProductData['prices'];
+      
+      productData.prices[platform] = {
+        price: similarProduct.price,
+        unit: similarProduct.unit,
+        url: similarProduct.url
       };
-      processedProducts.add(instamartMatch.name);
+      
+      // Mark this product as processed
+      processedProducts.add(similarProduct.name);
     }
     
     mergedProducts.push(productData);
-    processedProducts.add(zeptoProduct.name);
-  });
-  
-  // Add remaining products from Blinkit that weren't matched
-  blinkitProducts
-    .filter(product => !isProductProcessed(product.name, processedProducts))
-    .forEach((product, index) => {
-      const productId = `blinkit-${index}`;
-      const instamartMatch = findMatchingProduct(product.name, instamartProducts);
-      
-      const productData: ProductData = {
-        id: productId,
-        name: product.name,
-        imageUrl: product.imageUrl || '/placeholder.svg',
-        prices: {
-          blinkit: {
-            price: product.price,
-            unit: product.unit,
-            url: product.url
-          }
-        },
-        unit: product.unit
-      };
-      
-      // Add Instamart price if matched
-      if (instamartMatch) {
-        productData.prices.instamart = {
-          price: instamartMatch.price,
-          unit: instamartMatch.unit,
-          url: instamartMatch.url
-        };
-        processedProducts.add(instamartMatch.name);
-      }
-      
-      mergedProducts.push(productData);
-      processedProducts.add(product.name);
-    });
-  
-  // Add remaining products from Instamart that weren't matched
-  instamartProducts
-    .filter(product => !isProductProcessed(product.name, processedProducts))
-    .forEach((product, index) => {
-      const productId = `instamart-${index}`;
-      
-      mergedProducts.push({
-        id: productId,
-        name: product.name,
-        imageUrl: product.imageUrl || '/placeholder.svg',
-        prices: {
-          instamart: {
-            price: product.price,
-            unit: product.unit,
-            url: product.url
-          }
-        },
-        unit: product.unit
-      });
-    });
+  }
   
   // If no products were found, fall back to direct links
   if (mergedProducts.length === 0) {
@@ -355,16 +322,6 @@ function mergeProducts(
   }
   
   return mergedProducts;
-}
-
-function findMatchingProduct(productName: string, products: ScrapedResult[]): ScrapedResult | null {
-  for (const product of products) {
-    const similarity = string_similarity(productName.toLowerCase(), product.name.toLowerCase());
-    if (similarity >= 0.8) {
-      return product;
-    }
-  }
-  return null;
 }
 
 function isProductProcessed(productName: string, processedNames: Set<string>): boolean {
