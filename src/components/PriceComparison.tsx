@@ -1,40 +1,12 @@
-
 import React from 'react';
 import { ExternalLink } from 'lucide-react';
 import { ProductPrices } from './ProductCard';
 import { extractPrice } from '@/utils/string_similarity';
+import { platforms } from '@/utils/platformConfig';
 
 interface PriceComparisonProps {
   prices: ProductPrices;
 }
-
-interface PlatformDetails {
-  name: string;
-  logo: string;
-  color: string;
-  baseUrl: string;
-}
-
-const platforms: Record<string, PlatformDetails> = {
-  zepto: {
-    name: 'Zepto',
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png',
-    color: 'bg-[#792FD6]/10 text-[#792FD6]',
-    baseUrl: 'https://www.zeptonow.com/products/'
-  },
-  blinkit: {
-    name: 'Blinkit',
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png',
-    color: 'bg-[#F3CF00]/10 text-[#000000]',
-    baseUrl: 'https://blinkit.com/search/'
-  },
-  instamart: {
-    name: 'Instamart',
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg',
-    color: 'bg-[#FC8019]/10 text-[#FC8019]',
-    baseUrl: 'https://www.swiggy.com/instamart-search/'
-  },
-};
 
 const PriceComparison = ({ prices }: PriceComparisonProps) => {
   // Find the lowest price
