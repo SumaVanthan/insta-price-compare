@@ -1,6 +1,7 @@
+
 import { ProductData } from '@/components/ProductCard';
 import { SearchResultResponse, ScrapedResult } from './types';
-import { extractPrice } from './string_similarity';
+import { extractPrice } from './priceUtils';
 import { scrapeZeptoProducts } from './scrapers/zeptoScraper';
 import { scrapeBlinkitProducts } from './scrapers/blinkitScraper';
 import { scrapeInstamartProducts } from './scrapers/instamartScraper';

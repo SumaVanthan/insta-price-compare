@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { ExternalLink } from 'lucide-react';
 import { ProductPrices } from './ProductCard';
-import { extractPrice } from '@/utils/string_similarity';
+import { extractPrice } from '@/utils/priceUtils';
 import { platforms } from '@/utils/platformConfig';
 
 interface PriceComparisonProps {

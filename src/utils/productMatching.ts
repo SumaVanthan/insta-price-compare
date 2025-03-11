@@ -1,7 +1,7 @@
 
 import { ProductData } from '@/components/ProductCard';
 import { ScrapedResult } from './types';
-import { string_similarity, extractPrice } from './string_similarity';
+import { stringSimilarity, extractPrice } from './stringComparison';
 
 /**
  * Process and merge product data from multiple platforms based on similarity
@@ -36,7 +36,7 @@ export function mergeProducts(
     // Find all similar products across all platforms
     const similarProducts = allProducts.filter(p => 
       !isProductProcessed(p.name, processedProducts) && 
-      (p === product || string_similarity(p.name.toLowerCase(), product.name.toLowerCase()) >= similarityThreshold)
+      (p === product || stringSimilarity(p.name.toLowerCase(), product.name.toLowerCase()) >= similarityThreshold)
     );
     
     // Create a merged product data object
@@ -78,7 +78,7 @@ export function mergeProducts(
  */
 function isProductProcessed(productName: string, processedNames: Set<string>): boolean {
   for (const name of processedNames) {
-    if (string_similarity(productName.toLowerCase(), name.toLowerCase()) >= 0.8) {
+    if (stringSimilarity(productName.toLowerCase(), name.toLowerCase()) >= 0.8) {
       return true;
     }
   }
