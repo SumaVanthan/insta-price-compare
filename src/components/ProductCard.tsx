@@ -40,6 +40,11 @@ const ProductCard = ({ product, index }: ProductCardProps) => {
                 product.prices.blinkit?.unit || 
                 product.prices.instamart?.unit || '');
 
+  // Determine if this is a product with real prices (not just links)
+  const hasRealPrices = Object.values(product.prices).some(
+    p => p && !p.price.includes('Click to view') && !p.price.includes('Live Price')
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -47,7 +52,9 @@ const ProductCard = ({ product, index }: ProductCardProps) => {
       transition={{ duration: 0.4, delay: index * 0.1 }}
       className="group"
     >
-      <div className="glass-panel overflow-hidden rounded-2xl transition-apple hover:shadow-card">
+      <div className={`glass-panel overflow-hidden rounded-2xl transition-apple hover:shadow-card ${
+        hasRealPrices ? 'border-green-100' : ''
+      }`}>
         <div className="relative aspect-square overflow-hidden bg-secondary/50">
           {!imageLoaded && !imageError && (
             <div className="absolute inset-0 shimmer"></div>
@@ -63,10 +70,13 @@ const ProductCard = ({ product, index }: ProductCardProps) => {
               onLoad={handleImageLoad}
               onError={handleImageError}
               crossOrigin="anonymous" // Add crossOrigin to handle CORS
+              referrerPolicy="no-referrer" // Add referrerPolicy to help with some CORS issues
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-secondary text-center p-4">
-              <span className="text-xl font-medium text-foreground/70">{product.name}</span>
+              <span className="text-xl font-medium text-foreground/70">
+                {hasRealPrices ? product.name : 'View on Platform'}
+              </span>
             </div>
           )}
         </div>

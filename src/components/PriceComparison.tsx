@@ -38,11 +38,22 @@ const platforms: Record<string, PlatformDetails> = {
 const PriceComparison = ({ prices }: PriceComparisonProps) => {
   // Find the lowest price
   const priceValues = Object.entries(prices)
-    .filter(([_, details]) => details?.price && !details.price.includes('Click to view'))
-    .map(([platform, details]) => ({
-      platform,
-      price: parseFloat(details.price.replace(/[^\d.]/g, '')),
-    }));
+    .filter(([_, details]) => details?.price && !details.price.includes('Click to view') && !details.price.includes('Live Price'))
+    .map(([platform, details]) => {
+      // Extract the numeric price
+      let numericPrice = 0;
+      if (details.price) {
+        const priceMatch = details.price.match(/\d+(\.\d+)?/);
+        if (priceMatch) {
+          numericPrice = parseFloat(priceMatch[0]);
+        }
+      }
+      
+      return {
+        platform,
+        price: numericPrice,
+      };
+    });
 
   const lowestPrice = priceValues.length > 0 
     ? Math.min(...priceValues.map((item) => item.price)) 
@@ -52,7 +63,11 @@ const PriceComparison = ({ prices }: PriceComparisonProps) => {
     if (!price || price.price.includes('Click to view') || price.price.includes('Live Price')) return false;
     
     try {
-      const numericPrice = parseFloat(price.price.replace(/[^\d.]/g, ''));
+      // Extract the numeric price
+      const priceMatch = price.price.match(/\d+(\.\d+)?/);
+      if (!priceMatch) return false;
+      
+      const numericPrice = parseFloat(priceMatch[0]);
       return numericPrice === lowestPrice && lowestPrice > 0;
     } catch {
       return false;
