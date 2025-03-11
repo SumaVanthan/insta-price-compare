@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { Button } from './ui/button';
 import { ExternalLink } from 'lucide-react';
 import { ProductPrices } from './ProductCard';
 
@@ -39,21 +38,25 @@ const platforms: Record<string, PlatformDetails> = {
 const PriceComparison = ({ prices }: PriceComparisonProps) => {
   // Find the lowest price
   const priceValues = Object.entries(prices)
-    .filter(([_, details]) => details?.price)
+    .filter(([_, details]) => details?.price && !details.price.includes('Click to view'))
     .map(([platform, details]) => ({
       platform,
       price: parseFloat(details.price.replace(/[^\d.]/g, '')),
     }));
 
-  const lowestPrice = Math.min(
-    ...priceValues.map((item) => item.price)
-  );
+  const lowestPrice = priceValues.length > 0 
+    ? Math.min(...priceValues.map((item) => item.price)) 
+    : 0;
 
   const getBestDeal = (platform: string, price?: { price: string; url?: string }) => {
-    if (!price) return false;
+    if (!price || price.price.includes('Click to view') || price.price.includes('Live Price')) return false;
     
-    const numericPrice = parseFloat(price.price.replace(/[^\d.]/g, ''));
-    return numericPrice === lowestPrice;
+    try {
+      const numericPrice = parseFloat(price.price.replace(/[^\d.]/g, ''));
+      return numericPrice === lowestPrice && lowestPrice > 0;
+    } catch {
+      return false;
+    }
   };
 
   return (

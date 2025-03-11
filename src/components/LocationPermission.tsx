@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { getUserLocation } from '@/utils/location';
+import { getLocation } from '@/utils/location';
 
 interface LocationPermissionProps {
   onLocationGranted: (coords: { latitude: number; longitude: number }) => void;
@@ -17,7 +17,7 @@ const LocationPermission = ({ onLocationGranted }: LocationPermissionProps) => {
     setPermissionStatus('requesting');
     setError(null);
     
-    getUserLocation()
+    getLocation()
       .then((coords) => {
         setPermissionStatus('granted');
         onLocationGranted(coords);

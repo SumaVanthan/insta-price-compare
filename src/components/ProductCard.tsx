@@ -62,6 +62,7 @@ const ProductCard = ({ product, index }: ProductCardProps) => {
               }`}
               onLoad={handleImageLoad}
               onError={handleImageError}
+              crossOrigin="anonymous" // Add crossOrigin to handle CORS
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-secondary text-center p-4">
