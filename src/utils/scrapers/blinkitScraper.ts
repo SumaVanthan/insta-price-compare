@@ -12,48 +12,96 @@ export async function scrapeBlinkitProducts(query: string): Promise<ScrapedResul
     
     const products: ScrapedResult[] = [];
     
-    // Find product containers - expanded selectors to capture more product types
+    console.log(`Raw HTML from Blinkit length: ${html.length}`);
+    
+    // Improved product card selectors
     const productCards = Array.from(doc.querySelectorAll(
-      'div[data-testid="product-card"], .product-card, .plp-product, [class*="product-item"], [class*="ProductCard"]'
+      'div[data-testid="product-card"], [class*="product-card"], [class*="ProductCard"], [class*="plp-product"], [class*="product-item"], [class*="sku-item"], [class*="product"]'
     ));
     
     console.log(`Found ${productCards.length} Blinkit product cards`);
     
+    // If we don't find products with our selectors, create basic placeholder results
+    if (productCards.length === 0) {
+      // Ensure we at least return the search link
+      return [{
+        name: `${query} on Blinkit`,
+        price: 'Click to view',
+        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png',
+        unit: 'Search result',
+        url: searchUrl
+      }];
+    }
+    
     productCards.forEach((card, index) => {
       try {
-        // Extract image - expanded selectors
-        const imageElement = card.querySelector('.tw-h-full.tw-w-full.tw-transition-opacity, img[loading="lazy"], img.product-image, img[class*="ProductImage"]');
+        // More flexible image extraction
+        const allImages = card.querySelectorAll('img');
         let imageUrl = '';
-        if (imageElement && imageElement instanceof HTMLImageElement) {
-          imageUrl = imageElement.src || imageElement.getAttribute('data-src') || '';
+        for (const img of Array.from(allImages)) {
+          const src = img.getAttribute('src') || '';
+          const dataSrc = img.getAttribute('data-src') || '';
+          if (src && !src.includes('data:image') && src.includes('http')) {
+            imageUrl = src;
+            break;
+          } else if (dataSrc && dataSrc.includes('http')) {
+            imageUrl = dataSrc;
+            break;
+          }
         }
         
-        // Extract name - expanded selectors
-        const nameElement = card.querySelector('.tw-text-300.tw-font-semibold.tw-line-clamp-2, [class*="product-name"], [class*="ProductName"], h3, h2');
-        const name = nameElement ? nameElement.textContent?.trim() || '' : '';
+        // Extract name - try multiple selectors
+        const nameElements = card.querySelectorAll('h3, h2, [class*="name"], [class*="title"], [class*="Name"], [class*="Title"]');
+        let name = '';
+        for (const el of Array.from(nameElements)) {
+          const text = el.textContent?.trim();
+          if (text && text.length > 2) {
+            name = text;
+            break;
+          }
+        }
         
-        // Extract quantity/unit - expanded selectors
-        const quantityElement = card.querySelector('.tw-text-200.tw-font-medium.tw-line-clamp-1, [class*="product-weight"], [class*="ProductWeight"], [class*="UnitText"]');
-        const unit = quantityElement ? quantityElement.textContent?.trim() || '' : '';
+        // Extract quantity/unit
+        const quantityElements = card.querySelectorAll('[class*="weight"], [class*="unit"], [class*="quantity"], [class*="Unit"], [class*="Quantity"]');
+        let unit = '';
+        for (const el of Array.from(quantityElements)) {
+          const text = el.textContent?.trim();
+          if (text && text.length > 0) {
+            unit = text;
+            break;
+          }
+        }
         
-        // Extract price - expanded selectors
-        const priceElement = card.querySelector('.tw-text-200.tw-font-semibold, [class*="product-price"], [class*="ProductPrice"], [class*="PriceText"]');
-        const price = priceElement ? priceElement.textContent?.trim() || '' : '';
+        // Extract price
+        const priceElements = card.querySelectorAll('[class*="price"], [class*="Price"]');
+        let price = '';
+        for (const el of Array.from(priceElements)) {
+          const text = el.textContent?.trim();
+          if (text && text.length > 0 && (text.includes('₹') || text.includes('Rs') || /\d+/.test(text))) {
+            price = text;
+            break;
+          }
+        }
         
         // Extract product URL
-        const linkElement = card.closest('a');
-        const relativeUrl = linkElement ? linkElement.getAttribute('href') || '' : '';
-        const productUrl = relativeUrl.startsWith('http') ? 
-          relativeUrl : 
-          `https://blinkit.com${relativeUrl.startsWith('/') ? '' : '/'}${relativeUrl}`;
+        const links = card.querySelectorAll('a');
+        let productUrl = searchUrl;
+        for (const link of Array.from(links)) {
+          const href = link.getAttribute('href');
+          if (href && href.length > 1) {
+            productUrl = href.startsWith('http') ? href : `https://blinkit.com${href.startsWith('/') ? '' : '/'}${href}`;
+            break;
+          }
+        }
         
-        if (name && price) {
+        if (name || price) {
+          // Even if we only have partial data, include it
           products.push({
-            name,
-            price,
+            name: name || `${query} product ${index + 1}`,
+            price: price || 'Click to view price',
             imageUrl,
             unit,
-            url: productUrl || searchUrl
+            url: productUrl
           });
         }
       } catch (err) {
@@ -62,9 +110,22 @@ export async function scrapeBlinkitProducts(query: string): Promise<ScrapedResul
     });
     
     console.log(`Successfully scraped ${products.length} Blinkit products`);
-    return products;
+    return products.length > 0 ? products : [{
+      name: `${query} on Blinkit`,
+      price: 'Click to view',
+      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png',
+      unit: 'Search result',
+      url: searchUrl
+    }];
   } catch (error) {
     console.error('Error scraping Blinkit:', error);
-    return [];
+    // Return at least one fallback result
+    return [{
+      name: `${query} on Blinkit`,
+      price: 'Click to view',
+      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png',
+      unit: 'Search result',
+      url: `https://blinkit.com/s/?q=${encodeURIComponent(query)}`
+    }];
   }
 }

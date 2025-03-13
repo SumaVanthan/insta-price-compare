@@ -19,6 +19,12 @@ export function mergeProducts(
     instamart: instamartProducts.length
   });
   
+  // If all platforms returned no products, return fallback
+  if (zeptoProducts.length === 0 && blinkitProducts.length === 0 && instamartProducts.length === 0) {
+    console.log('No products found on any platform, using fallback');
+    return getFallbackProducts(query);
+  }
+  
   const mergedProducts: ProductData[] = [];
   const processedProducts = new Set<string>();
   const similarityThreshold = 0.8; // 80% name similarity as requested
@@ -30,6 +36,9 @@ export function mergeProducts(
     ...instamartProducts.map(p => ({ ...p, source: 'instamart' }))
   ];
   
+  // Log the total number of products across all platforms
+  console.log(`Total products to merge: ${allProducts.length}`);
+  
   // Sort products by name for more deterministic grouping
   allProducts.sort((a, b) => a.name.localeCompare(b.name));
   
@@ -40,11 +49,15 @@ export function mergeProducts(
       continue;
     }
     
+    console.log(`Processing product: ${product.name} from ${product.source}`);
+    
     // Find all similar products across all platforms
     const similarProducts = allProducts.filter(p => 
       !isProductProcessed(p.name, processedProducts) && 
       (p === product || stringSimilarity(p.name.toLowerCase(), product.name.toLowerCase()) >= similarityThreshold)
     );
+    
+    console.log(`Found ${similarProducts.length} similar products for ${product.name}`);
     
     // Create a merged product data object
     const productData: ProductData = {
@@ -88,7 +101,7 @@ export function mergeProducts(
   
   console.log('Total merged products:', mergedProducts.length);
   
-  // If no products were found, fall back to direct links
+  // If we somehow ended up with no products, fall back to direct links
   if (mergedProducts.length === 0) {
     return getFallbackProducts(query);
   }
