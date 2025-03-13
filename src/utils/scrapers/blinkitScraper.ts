@@ -215,6 +215,7 @@ export async function scrapeBlinkitProducts(query: string): Promise<ScrapedResul
   } catch (error) {
     console.error('Error scraping Blinkit:', error);
     // Return mock data if scraping fails
+    const searchUrl = `https://blinkit.com/s/?q=${encodeURIComponent(query)}`;
     return getMockBlinkitProducts(query, searchUrl);
   }
 }

@@ -212,6 +212,7 @@ export async function scrapeZeptoProducts(query: string): Promise<ScrapedResult[
   } catch (error) {
     console.error('Error scraping Zepto:', error);
     // Return mock data if scraping fails
+    const searchUrl = `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`;
     return getMockZeptoProducts(query, searchUrl);
   }
 }

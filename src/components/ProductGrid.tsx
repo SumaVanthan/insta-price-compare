@@ -8,7 +8,8 @@ import {
   PaginationItem, 
   PaginationLink,
   PaginationNext,
-  PaginationPrevious
+  PaginationPrevious,
+  PaginationEllipsis
 } from './ui/pagination';
 
 interface ProductGridProps {
@@ -107,7 +108,7 @@ const ProductGrid = ({ products }: ProductGridProps) => {
                 {/* Add ellipsis if needed */}
                 {index > 0 && pageNumber - pageNumbers[index - 1] > 1 && (
                   <PaginationItem>
-                    <PaginationLink disabled>...</PaginationLink>
+                    <PaginationEllipsis />
                   </PaginationItem>
                 )}
                 

@@ -218,6 +218,7 @@ export async function scrapeInstamartProducts(query: string): Promise<ScrapedRes
   } catch (error) {
     console.error('Error scraping Instamart:', error);
     // Return mock data if scraping fails
+    const searchUrl = `https://www.swiggy.com/instamart/search?custom_back=true&query=${encodeURIComponent(query)}`;
     return getMockInstamartProducts(query, searchUrl);
   }
 }
