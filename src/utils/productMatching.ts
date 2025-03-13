@@ -1,7 +1,8 @@
 
 import { ProductData } from '@/components/ProductCard';
 import { ScrapedResult } from './types';
-import { stringSimilarity, extractPrice } from './stringComparison';
+import { stringSimilarity } from './stringComparison';
+import { extractPrice } from './priceUtils';
 
 /**
  * Process and merge product data from multiple platforms based on similarity
@@ -12,9 +13,15 @@ export function mergeProducts(
   instamartProducts: ScrapedResult[],
   query: string
 ): ProductData[] {
+  console.log('Raw product counts:', {
+    zepto: zeptoProducts.length,
+    blinkit: blinkitProducts.length,
+    instamart: instamartProducts.length
+  });
+  
   const mergedProducts: ProductData[] = [];
   const processedProducts = new Set<string>();
-  const similarityThreshold = 0.8; // 80% name similarity to consider products the same
+  const similarityThreshold = 0.85; // Higher threshold for stricter matching
   
   // Create a master list of all products
   const allProducts: Array<ScrapedResult & { source: string }> = [
@@ -65,6 +72,8 @@ export function mergeProducts(
     mergedProducts.push(productData);
   }
   
+  console.log('Total merged products:', mergedProducts.length);
+  
   // If no products were found, fall back to direct links
   if (mergedProducts.length === 0) {
     return getFallbackProducts(query);
@@ -75,10 +84,11 @@ export function mergeProducts(
 
 /**
  * Check if a product has already been processed based on name similarity
+ * Now using a stricter similarity check to avoid over-matching
  */
 function isProductProcessed(productName: string, processedNames: Set<string>): boolean {
   for (const name of processedNames) {
-    if (stringSimilarity(productName.toLowerCase(), name.toLowerCase()) >= 0.8) {
+    if (stringSimilarity(productName.toLowerCase(), name.toLowerCase()) >= 0.9) { // Higher threshold
       return true;
     }
   }

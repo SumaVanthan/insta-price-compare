@@ -27,6 +27,12 @@ export const searchProducts = async (
       scrapeInstamartProducts(query)
     ]);
 
+    console.log('Raw products count:', { 
+      zepto: zeptoProducts.length, 
+      blinkit: blinkitProducts.length, 
+      instamart: instamartProducts.length 
+    });
+    
     // Add numeric price to each product for comparison
     const productsWithNumericPrice = [
       ...zeptoProducts, 
@@ -37,11 +43,7 @@ export const searchProducts = async (
       numericPrice: extractPrice(product.price)
     }));
 
-    console.log('Scraped products:', { 
-      zeptoProducts, 
-      blinkitProducts, 
-      instamartProducts 
-    });
+    console.log('Total products scraped:', productsWithNumericPrice.length);
     
     // Merge similar products across platforms
     const mergedProducts = mergeProducts(
