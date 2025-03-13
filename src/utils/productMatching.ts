@@ -13,7 +13,7 @@ export function mergeProducts(
   instamartProducts: ScrapedResult[],
   query: string
 ): ProductData[] {
-  console.log('Raw product counts:', {
+  console.log('Raw product counts for matching:', {
     zepto: zeptoProducts.length,
     blinkit: blinkitProducts.length,
     instamart: instamartProducts.length
@@ -21,7 +21,7 @@ export function mergeProducts(
   
   const mergedProducts: ProductData[] = [];
   const processedProducts = new Set<string>();
-  const similarityThreshold = 0.85; // Higher threshold for stricter matching
+  const similarityThreshold = 0.8; // 80% name similarity as requested
   
   // Create a master list of all products
   const allProducts: Array<ScrapedResult & { source: string }> = [
@@ -69,6 +69,20 @@ export function mergeProducts(
       processedProducts.add(similarProduct.name);
     }
     
+    // For platforms without this product, add "Not available"
+    const availablePlatforms = new Set(similarProducts.map(p => p.source));
+    const allPlatforms = ['zepto', 'blinkit', 'instamart'];
+    
+    allPlatforms.forEach(platform => {
+      if (!availablePlatforms.has(platform)) {
+        productData.prices[platform as keyof ProductData['prices']] = {
+          price: 'Not available',
+          unit: '',
+          url: `https://${getPlatformBaseUrl(platform)}/search?q=${encodeURIComponent(query)}`
+        };
+      }
+    });
+    
     mergedProducts.push(productData);
   }
   
@@ -83,12 +97,27 @@ export function mergeProducts(
 }
 
 /**
+ * Helper to get platform base URLs for "Not available" products
+ */
+function getPlatformBaseUrl(platform: string): string {
+  switch (platform) {
+    case 'zepto':
+      return 'www.zeptonow.com';
+    case 'blinkit':
+      return 'blinkit.com';
+    case 'instamart':
+      return 'www.swiggy.com/instamart';
+    default:
+      return '';
+  }
+}
+
+/**
  * Check if a product has already been processed based on name similarity
- * Now using a stricter similarity check to avoid over-matching
  */
 function isProductProcessed(productName: string, processedNames: Set<string>): boolean {
   for (const name of processedNames) {
-    if (stringSimilarity(productName.toLowerCase(), name.toLowerCase()) >= 0.9) { // Higher threshold
+    if (stringSimilarity(productName.toLowerCase(), name.toLowerCase()) >= 0.8) { // Using 80% threshold
       return true;
     }
   }

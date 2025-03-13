@@ -13,16 +13,18 @@ export async function scrapeZeptoProducts(query: string): Promise<ScrapedResult[
     
     const products: ScrapedResult[] = [];
     
-    // Find product containers
-    const productCards = doc.querySelectorAll('[data-testid="product-card"]');
+    // Find product containers - modified selector to capture ALL product cards
+    const productCards = Array.from(doc.querySelectorAll('[data-testid="product-card"], .product-card, .product-item, .product-container'));
     
-    productCards.forEach(card => {
+    console.log(`Found ${productCards.length} Zepto product cards`);
+    
+    productCards.forEach((card, index) => {
       try {
         // Extract image
-        const imageContainer = card.querySelector('.relative.z-0.rounded-xl.bg-gray-200');
+        const imageContainer = card.querySelector('.relative.z-0.rounded-xl.bg-gray-200, .product-image, img');
         let imageUrl = '';
         if (imageContainer) {
-          const img = imageContainer.querySelector('img');
+          const img = imageContainer.querySelector('img') || (imageContainer.tagName === 'IMG' ? imageContainer : null);
           if (img) {
             // Try to get srcset or src
             const srcset = img.getAttribute('srcset');
@@ -36,15 +38,15 @@ export async function scrapeZeptoProducts(query: string): Promise<ScrapedResult[
         }
         
         // Extract name
-        const nameElement = card.querySelector('.mt-2.\\!h-12.lg\\:\\!h-16');
+        const nameElement = card.querySelector('.mt-2.\\!h-12.lg\\:\\!h-16, .product-name, [class*="product-title"], h3, h2');
         const name = nameElement ? nameElement.textContent?.trim() || '' : '';
         
         // Extract quantity
-        const quantityElement = card.querySelector('[class*="font-subtitle"][class*="text-lg"]');
+        const quantityElement = card.querySelector('[class*="font-subtitle"][class*="text-lg"], .product-weight, .product-quantity, .product-unit');
         const unit = quantityElement ? quantityElement.textContent?.trim() || '' : '';
         
         // Extract price
-        const priceElement = card.querySelector('[data-testid="product-card-price"]');
+        const priceElement = card.querySelector('[data-testid="product-card-price"], .product-price, .price, [class*="price"]');
         const price = priceElement ? priceElement.textContent?.trim() || '' : '';
         
         // Extract product URL
@@ -63,10 +65,11 @@ export async function scrapeZeptoProducts(query: string): Promise<ScrapedResult[
           });
         }
       } catch (err) {
-        console.error('Error scraping Zepto product:', err);
+        console.error(`Error scraping Zepto product #${index}:`, err);
       }
     });
     
+    console.log(`Successfully scraped ${products.length} Zepto products`);
     return products;
   } catch (error) {
     console.error('Error scraping Zepto:', error);
