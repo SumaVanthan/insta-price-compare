@@ -1,12 +1,36 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 interface LoadingStateProps {
   message?: string;
+  startTime?: number;
 }
 
-const LoadingState = ({ message = 'Searching for the best prices...' }: LoadingStateProps) => {
+const LoadingState = ({ 
+  message = 'Searching for the best prices...',
+  startTime = Date.now()
+}: LoadingStateProps) => {
+  const [elapsedTime, setElapsedTime] = useState(0);
+  
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [startTime]);
+  
+  // Dynamic messages based on elapsed time
+  const getTimedMessage = () => {
+    if (elapsedTime > 20) {
+      return "This is taking longer than expected. Please wait a moment...";
+    } else if (elapsedTime > 10) {
+      return "Still working on getting the best prices for you...";
+    }
+    return message;
+  };
+  
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -39,9 +63,20 @@ const LoadingState = ({ message = 'Searching for the best prices...' }: LoadingS
         initial={{ y: 10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
+        key={getTimedMessage()} // Force re-render when message changes
       >
-        {message}
+        {getTimedMessage()}
       </motion.p>
+
+      {elapsedTime > 5 && (
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mt-2 text-sm text-muted-foreground"
+        >
+          Time elapsed: {elapsedTime} seconds
+        </motion.p>
+      )}
 
       <motion.div 
         className="mt-8 flex flex-col items-center space-y-2 text-sm text-muted-foreground"

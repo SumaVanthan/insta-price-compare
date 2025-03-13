@@ -17,7 +17,30 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchStartTime, setSearchStartTime] = useState(Date.now());
   const { toast } = useToast();
+
+  // Add a timeout effect to prevent infinite loading
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (isLoading) {
+      timeoutId = setTimeout(() => {
+        setIsLoading(false);
+        setError('Search timed out. Please try again or try a different search term.');
+        toast({
+          title: "Search timed out",
+          description: "Our search is taking too long. Please try again or try a different search term.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }, 30000); // 30 seconds timeout
+    }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isLoading, toast]);
 
   const handleLocationGranted = (coords: { latitude: number; longitude: number }) => {
     setLocation(coords);
@@ -37,26 +60,33 @@ const Index = () => {
     setIsLoading(true);
     setError(null);
     setHasSearched(true);
+    setSearchStartTime(Date.now());
     
     try {
       const result = await searchProducts(query, location);
-      setProducts(result.products);
       
-      if (result.products.length === 0) {
+      // Only update state if we're still in loading state (not timed out)
+      if (isLoading) {
+        setProducts(result.products);
+        
+        if (result.products.length === 0) {
+          toast({
+            title: "No products found",
+            description: "Try a different search term or check back later.",
+            duration: 3000,
+          });
+        }
+      }
+    } catch (err) {
+      if (isLoading) {
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred');
         toast({
-          title: "No products found",
-          description: "Try a different search term or check back later.",
+          title: "Search failed",
+          description: err instanceof Error ? err.message : 'Failed to search for products',
+          variant: "destructive",
           duration: 3000,
         });
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
-      toast({
-        title: "Search failed",
-        description: err instanceof Error ? err.message : 'Failed to search for products',
-        variant: "destructive",
-        duration: 3000,
-      });
     } finally {
       setIsLoading(false);
     }
@@ -114,7 +144,7 @@ const Index = () => {
         
         <AnimatePresence mode="wait">
           {isLoading ? (
-            <LoadingState key="loading" />
+            <LoadingState key="loading" startTime={searchStartTime} />
           ) : error ? (
             <ErrorState key="error" message={error} onRetry={retrySearch} />
           ) : hasSearched && products.length === 0 ? (

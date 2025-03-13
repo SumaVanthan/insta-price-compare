@@ -20,6 +20,9 @@ export async function fetchWithCorsProxy(url: string): Promise<string> {
     return getMockResponse(url);
   }
 
+  // Set a timeout for each proxy attempt
+  const FETCH_TIMEOUT = 5000; // 5 seconds per proxy
+  
   // Try each proxy in sequence
   let lastError;
   for (const proxyCreator of corsProxies) {
@@ -27,12 +30,22 @@ export async function fetchWithCorsProxy(url: string): Promise<string> {
       const proxyUrl = proxyCreator(url);
       console.log(`Trying CORS proxy: ${proxyUrl}`);
       
-      const response = await fetch(proxyUrl, {
+      const fetchPromise = fetch(proxyUrl, {
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
           'Origin': window.location.origin
         }
       });
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise<Response>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Fetch timeout after ${FETCH_TIMEOUT}ms for ${proxyUrl}`));
+        }, FETCH_TIMEOUT);
+      });
+      
+      // Race between the fetch and the timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
       
       if (!response.ok) {
         console.warn(`Proxy failed with status ${response.status}, trying next...`);

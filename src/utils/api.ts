@@ -7,6 +7,25 @@ import { scrapeBlinkitProducts } from './scrapers/blinkitScraper';
 import { scrapeInstamartProducts } from './scrapers/instamartScraper';
 import { mergeProducts, getFallbackProducts } from './productMatching';
 
+// Helper function to add timeout to promises
+const withTimeout = (promise: Promise<any>, timeoutMs: number, fallback: any) => {
+  let timeoutId: NodeJS.Timeout;
+  const timeoutPromise = new Promise(resolve => {
+    timeoutId = setTimeout(() => {
+      console.log(`Promise timed out after ${timeoutMs}ms`);
+      resolve(fallback);
+    }, timeoutMs);
+  });
+
+  return Promise.race([
+    promise.then(result => {
+      clearTimeout(timeoutId);
+      return result;
+    }),
+    timeoutPromise
+  ]);
+};
+
 /**
  * Search for products across multiple platforms
  * @param query Search query
@@ -20,11 +39,14 @@ export const searchProducts = async (
   console.log(`Searching for "${query}" at location:`, location);
   
   try {
-    // Fetch from multiple platforms in parallel
+    // Set timeout for each scraper to 10 seconds
+    const timeoutMs = 10000;
+    
+    // Fetch from multiple platforms in parallel with timeout
     const [zeptoProducts, blinkitProducts, instamartProducts] = await Promise.all([
-      scrapeZeptoProducts(query),
-      scrapeBlinkitProducts(query),
-      scrapeInstamartProducts(query)
+      withTimeout(scrapeZeptoProducts(query), timeoutMs, []),
+      withTimeout(scrapeBlinkitProducts(query), timeoutMs, []),
+      withTimeout(scrapeInstamartProducts(query), timeoutMs, [])
     ]);
 
     console.log('Raw products count:', { 
@@ -44,6 +66,12 @@ export const searchProducts = async (
     }));
 
     console.log('Total products scraped:', productsWithNumericPrice.length);
+    
+    // If no products found at all, return fallback products immediately
+    if (productsWithNumericPrice.length === 0) {
+      console.log('No products found, using fallback');
+      return { products: getFallbackProducts(query) };
+    }
     
     // Merge similar products across platforms
     const mergedProducts = mergeProducts(
