@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Layout from '@/components/Layout';
@@ -18,9 +17,9 @@ const Index = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [searchStartTime, setSearchStartTime] = useState(Date.now());
+  const [currentQuery, setCurrentQuery] = useState<string>('');
   const { toast } = useToast();
 
-  // Add a timeout effect to prevent infinite loading
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
@@ -34,7 +33,7 @@ const Index = () => {
           variant: "destructive",
           duration: 5000,
         });
-      }, 30000); // 30 seconds timeout
+      }, 20000); // 20 seconds timeout
     }
     
     return () => {
@@ -61,13 +60,20 @@ const Index = () => {
     setError(null);
     setHasSearched(true);
     setSearchStartTime(Date.now());
+    setCurrentQuery(query);
+    
+    console.log(`Starting search for "${query}"`);
     
     try {
-      const result = await searchProducts(query, location);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
       
-      // Only update state if we're still in loading state (not timed out)
+      const result = await searchProducts(query, location);
+      clearTimeout(timeoutId);
+      
       if (isLoading) {
         setProducts(result.products);
+        console.log(`Search completed with ${result.products.length} products`);
         
         if (result.products.length === 0) {
           toast({
@@ -79,10 +85,13 @@ const Index = () => {
       }
     } catch (err) {
       if (isLoading) {
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+        console.error(`Search error: ${errorMessage}`);
+        
+        setError(errorMessage);
         toast({
           title: "Search failed",
-          description: err instanceof Error ? err.message : 'Failed to search for products',
+          description: errorMessage,
           variant: "destructive",
           duration: 3000,
         });
@@ -93,9 +102,10 @@ const Index = () => {
   };
 
   const retrySearch = () => {
-    // Re-run the last search
-    if (hasSearched) {
-      handleSearch('milk'); // In a real app, we'd store the last query
+    if (currentQuery) {
+      handleSearch(currentQuery);
+    } else if (hasSearched) {
+      handleSearch('milk');
     }
   };
 

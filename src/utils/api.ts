@@ -1,30 +1,7 @@
-
 import { ProductData } from '@/components/ProductCard';
-import { SearchResultResponse, ScrapedResult } from './types';
+import { SearchResultResponse } from './types';
 import { extractPrice } from './priceUtils';
-import { scrapeZeptoProducts } from './scrapers/zeptoScraper';
-import { scrapeBlinkitProducts } from './scrapers/blinkitScraper';
-import { scrapeInstamartProducts } from './scrapers/instamartScraper';
-import { mergeProducts, getFallbackProducts } from './productMatching';
-
-// Helper function to add timeout to promises
-const withTimeout = (promise: Promise<any>, timeoutMs: number, fallback: any) => {
-  let timeoutId: NodeJS.Timeout;
-  const timeoutPromise = new Promise(resolve => {
-    timeoutId = setTimeout(() => {
-      console.log(`Promise timed out after ${timeoutMs}ms`);
-      resolve(fallback);
-    }, timeoutMs);
-  });
-
-  return Promise.race([
-    promise.then(result => {
-      clearTimeout(timeoutId);
-      return result;
-    }),
-    timeoutPromise
-  ]);
-};
+import { scraperService } from './scraping/ScraperService';
 
 /**
  * Search for products across multiple platforms
@@ -36,56 +13,16 @@ export const searchProducts = async (
   query: string,
   location: { latitude: number; longitude: number }
 ): Promise<SearchResultResponse> => {
-  console.log(`Searching for "${query}" at location:`, location);
+  console.log(`API: Searching for "${query}" at location:`, location);
   
   try {
-    // Set timeout for each scraper to 10 seconds
-    const timeoutMs = 10000;
-    
-    // Fetch from multiple platforms in parallel with timeout
-    const [zeptoProducts, blinkitProducts, instamartProducts] = await Promise.all([
-      withTimeout(scrapeZeptoProducts(query), timeoutMs, []),
-      withTimeout(scrapeBlinkitProducts(query), timeoutMs, []),
-      withTimeout(scrapeInstamartProducts(query), timeoutMs, [])
-    ]);
-
-    console.log('Raw products count:', { 
-      zepto: zeptoProducts.length, 
-      blinkit: blinkitProducts.length, 
-      instamart: instamartProducts.length 
-    });
-    
-    // Add numeric price to each product for comparison
-    const productsWithNumericPrice = [
-      ...zeptoProducts, 
-      ...blinkitProducts, 
-      ...instamartProducts
-    ].map(product => ({
-      ...product,
-      numericPrice: extractPrice(product.price)
-    }));
-
-    console.log('Total products scraped:', productsWithNumericPrice.length);
-    
-    // If no products found at all, return fallback products immediately
-    if (productsWithNumericPrice.length === 0) {
-      console.log('No products found, using fallback');
-      return { products: getFallbackProducts(query) };
-    }
-    
-    // Merge similar products across platforms
-    const mergedProducts = mergeProducts(
-      zeptoProducts, 
-      blinkitProducts, 
-      instamartProducts, 
-      query
-    );
-    
-    return { products: mergedProducts };
+    // Delegate to the scraper service with proper error handling
+    const results = await scraperService.searchProducts(query, location);
+    console.log(`API: Found ${results.products.length} products for query "${query}"`);
+    return results;
   } catch (error) {
-    console.error('Scraping error:', error);
-    // If scraping fails, use a fallback approach to show the expected structure
-    return { products: getFallbackProducts(query) };
+    console.error('API search error:', error);
+    throw error;
   }
 };
 
