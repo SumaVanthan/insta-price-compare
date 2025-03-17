@@ -19,7 +19,9 @@ export class ScraperClient {
   private cache: Map<string, {data: any, timestamp: number}> = new Map();
   private cacheTTL: number = 5 * 60 * 1000; // 5 minutes
   
-  constructor(private timeout: number = 5000) {}
+  constructor(private timeout: number = 5000) {
+    console.log(`[ScraperClient] Initialized with timeout: ${timeout}ms`);
+  }
   
   async fetch(url: string): Promise<ScraperResult> {
     const startTime = Date.now();
@@ -27,7 +29,7 @@ export class ScraperClient {
     // Check cache first
     const cachedResult = this.getFromCache(url);
     if (cachedResult) {
-      console.log(`Using cached result for ${url}`);
+      console.log(`[ScraperClient] Using cached result for ${url}`);
       return { 
         success: true, 
         data: cachedResult,
@@ -35,12 +37,13 @@ export class ScraperClient {
       };
     }
     
-    console.log(`Fetching ${url} with timeout ${this.timeout}ms`);
+    console.log(`[ScraperClient] Fetching ${url} with timeout ${this.timeout}ms`);
     
-    // Try each proxy in parallel (not sequentially)
-    const proxyPromises = this.proxyUrls.map(proxyUrl => 
-      this.fetchWithProxy(proxyUrl, url)
-    );
+    // Try each proxy in parallel
+    const proxyPromises = this.proxyUrls.map(proxyUrl => {
+      console.log(`[ScraperClient] Trying proxy: ${proxyUrl.split('/')[2]} for ${url}`);
+      return this.fetchWithProxy(proxyUrl, url);
+    });
     
     try {
       // Race all proxy requests
@@ -58,6 +61,8 @@ export class ScraperClient {
       const html = await response.text();
       
       if (html.length < 1000 || (!html.includes('<html') && !html.includes('<body'))) {
+        console.error(`[ScraperClient] Invalid HTML response (length: ${html.length})`);
+        console.log(`[ScraperClient] HTML preview: ${html.substring(0, 200)}...`);
         throw new Error('Invalid HTML response');
       }
       
@@ -65,7 +70,7 @@ export class ScraperClient {
       this.saveToCache(url, html);
       
       const duration = Date.now() - startTime;
-      console.log(`Successfully fetched ${url} in ${duration}ms`);
+      console.log(`[ScraperClient] Successfully fetched ${url} in ${duration}ms`);
       
       return {
         success: true,
@@ -73,7 +78,7 @@ export class ScraperClient {
         duration
       };
     } catch (error) {
-      console.error(`Error fetching ${url}:`, error);
+      console.error(`[ScraperClient] Error fetching ${url}:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -97,13 +102,18 @@ export class ScraperClient {
     const encodedUrl = encodeURIComponent(targetUrl);
     const proxyUrl = `${proxyBaseUrl}${encodedUrl}`;
     
-    return fetch(proxyUrl, {
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'Origin': window.location.origin
-      },
-      signal: AbortSignal.timeout(this.timeout)
-    });
+    try {
+      return fetch(proxyUrl, {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Origin': window.location.origin
+        },
+        signal: AbortSignal.timeout(this.timeout)
+      });
+    } catch (error) {
+      console.error(`[ScraperClient] Proxy ${proxyBaseUrl} failed:`, error);
+      throw error;
+    }
   }
   
   private getFromCache(url: string): any | null {
@@ -119,9 +129,11 @@ export class ScraperClient {
       data,
       timestamp: Date.now()
     });
+    console.log(`[ScraperClient] Saved result for ${url} to cache`);
   }
   
   clearCache(): void {
+    console.log(`[ScraperClient] Cache cleared (had ${this.cache.size} entries)`);
     this.cache.clear();
   }
 }

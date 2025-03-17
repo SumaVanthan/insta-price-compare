@@ -1,3 +1,4 @@
+
 import { ProductData } from '@/components/ProductCard';
 import { SearchResultResponse } from './types';
 import { extractPrice } from './priceUtils';
@@ -13,15 +14,43 @@ export const searchProducts = async (
   query: string,
   location: { latitude: number; longitude: number }
 ): Promise<SearchResultResponse> => {
-  console.log(`API: Searching for "${query}" at location:`, location);
+  console.log(`[API] Searching for "${query}" at location: ${location.latitude}, ${location.longitude}`);
   
   try {
     // Delegate to the scraper service with proper error handling
+    console.time('[API] Search execution time');
     const results = await scraperService.searchProducts(query, location);
-    console.log(`API: Found ${results.products.length} products for query "${query}"`);
+    console.timeEnd('[API] Search execution time');
+    
+    console.log(`[API] Found ${results.products.length} products for query "${query}"`);
+    
+    // Log product sources summary
+    const sourceCount = {
+      zepto: 0,
+      blinkit: 0,
+      instamart: 0,
+      mixed: 0
+    };
+    
+    results.products.forEach(product => {
+      if (product.sources) {
+        if (product.sources.length > 1) {
+          sourceCount.mixed++;
+        } else if (product.sources.includes('zepto')) {
+          sourceCount.zepto++;
+        } else if (product.sources.includes('blinkit')) {
+          sourceCount.blinkit++;
+        } else if (product.sources.includes('instamart')) {
+          sourceCount.instamart++;
+        }
+      }
+    });
+    
+    console.log('[API] Product sources breakdown:', sourceCount);
+    
     return results;
   } catch (error) {
-    console.error('API search error:', error);
+    console.error('[API] Search error:', error);
     throw error;
   }
 };
@@ -34,6 +63,7 @@ export const scrapeProductPrices = async (
   productId: string, 
   location: { latitude: number; longitude: number }
 ) => {
+  console.log(`[API] Scraping detailed prices for product ID: ${productId}`);
   // In a real implementation, this would call your backend API which handles the scraping
   // For demo purposes, we're returning a synthetic response
   try {
@@ -60,7 +90,7 @@ export const scrapeProductPrices = async (
       }
     };
   } catch (error) {
-    console.error('Error scraping product prices:', error);
+    console.error('[API] Error scraping product prices:', error);
     throw new Error('Failed to retrieve live price data');
   }
 };

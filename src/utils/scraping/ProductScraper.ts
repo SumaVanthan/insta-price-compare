@@ -11,11 +11,13 @@ export class ProductScraper {
   }
   
   async scrapeZeptoProducts(query: string): Promise<ScrapedResult[]> {
+    console.log(`[ProductScraper] Starting Zepto scrape for query: "${query}"`);
     const searchUrl = `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`;
     const result = await this.client.fetch(searchUrl);
     
     if (!result.success) {
-      console.error(`Failed to scrape Zepto: ${result.error}`);
+      console.error(`[ProductScraper] Failed to scrape Zepto: ${result.error}`);
+      console.log(`[ProductScraper] Falling back to mock Zepto data for "${query}"`);
       return this.getMockZeptoProducts(query);
     }
     
@@ -38,13 +40,13 @@ export class ProductScraper {
       for (const selector of productSelectors) {
         productElements = $(selector).toArray();
         if (productElements.length > 0) {
-          console.log(`Found ${productElements.length} Zepto products with selector: ${selector}`);
+          console.log(`[ProductScraper] Found ${productElements.length} Zepto products with selector: ${selector}`);
           break;
         }
       }
       
       if (productElements.length === 0) {
-        console.log('No Zepto products found, using mock data');
+        console.log('[ProductScraper] No Zepto products found in HTML, using mock data');
         return this.getMockZeptoProducts(query);
       }
       
@@ -95,23 +97,26 @@ export class ProductScraper {
             url
           });
         } catch (err) {
-          console.error(`Error extracting Zepto product data:`, err);
+          console.error(`[ProductScraper] Error extracting Zepto product data:`, err);
         }
       });
       
+      console.log(`[ProductScraper] Successfully extracted ${products.length} Zepto products`);
       return products.length > 0 ? products : this.getMockZeptoProducts(query);
     } catch (error) {
-      console.error('Error parsing Zepto HTML:', error);
+      console.error('[ProductScraper] Error parsing Zepto HTML:', error);
       return this.getMockZeptoProducts(query);
     }
   }
   
   async scrapeBlinkitProducts(query: string): Promise<ScrapedResult[]> {
+    console.log(`[ProductScraper] Starting Blinkit scrape for query: "${query}"`);
     const searchUrl = `https://blinkit.com/s/?q=${encodeURIComponent(query)}`;
     const result = await this.client.fetch(searchUrl);
     
     if (!result.success) {
-      console.error(`Failed to scrape Blinkit: ${result.error}`);
+      console.error(`[ProductScraper] Failed to scrape Blinkit: ${result.error}`);
+      console.log(`[ProductScraper] Falling back to mock Blinkit data for "${query}"`);
       return this.getMockBlinkitProducts(query);
     }
     
@@ -134,13 +139,13 @@ export class ProductScraper {
       for (const selector of productSelectors) {
         productElements = $(selector).toArray();
         if (productElements.length > 0) {
-          console.log(`Found ${productElements.length} Blinkit products with selector: ${selector}`);
+          console.log(`[ProductScraper] Found ${productElements.length} Blinkit products with selector: ${selector}`);
           break;
         }
       }
       
       if (productElements.length === 0) {
-        console.log('No Blinkit products found, using mock data');
+        console.log('[ProductScraper] No Blinkit products found in HTML, using mock data');
         return this.getMockBlinkitProducts(query);
       }
       
@@ -191,23 +196,26 @@ export class ProductScraper {
             url
           });
         } catch (err) {
-          console.error(`Error extracting Blinkit product data:`, err);
+          console.error(`[ProductScraper] Error extracting Blinkit product data:`, err);
         }
       });
       
+      console.log(`[ProductScraper] Successfully extracted ${products.length} Blinkit products`);
       return products.length > 0 ? products : this.getMockBlinkitProducts(query);
     } catch (error) {
-      console.error('Error parsing Blinkit HTML:', error);
+      console.error('[ProductScraper] Error parsing Blinkit HTML:', error);
       return this.getMockBlinkitProducts(query);
     }
   }
   
   async scrapeInstamartProducts(query: string): Promise<ScrapedResult[]> {
+    console.log(`[ProductScraper] Starting Instamart scrape for query: "${query}"`);
     const searchUrl = `https://www.swiggy.com/instamart/search?custom_back=true&query=${encodeURIComponent(query)}`;
     const result = await this.client.fetch(searchUrl);
     
     if (!result.success) {
-      console.error(`Failed to scrape Instamart: ${result.error}`);
+      console.error(`[ProductScraper] Failed to scrape Instamart: ${result.error}`);
+      console.log(`[ProductScraper] Falling back to mock Instamart data for "${query}"`);
       return this.getMockInstamartProducts(query);
     }
     
@@ -230,13 +238,13 @@ export class ProductScraper {
       for (const selector of productSelectors) {
         productElements = $(selector).toArray();
         if (productElements.length > 0) {
-          console.log(`Found ${productElements.length} Instamart products with selector: ${selector}`);
+          console.log(`[ProductScraper] Found ${productElements.length} Instamart products with selector: ${selector}`);
           break;
         }
       }
       
       if (productElements.length === 0) {
-        console.log('No Instamart products found, using mock data');
+        console.log('[ProductScraper] No Instamart products found in HTML, using mock data');
         return this.getMockInstamartProducts(query);
       }
       
@@ -287,20 +295,21 @@ export class ProductScraper {
             url
           });
         } catch (err) {
-          console.error(`Error extracting Instamart product data:`, err);
+          console.error(`[ProductScraper] Error extracting Instamart product data:`, err);
         }
       });
       
+      console.log(`[ProductScraper] Successfully extracted ${products.length} Instamart products`);
       return products.length > 0 ? products : this.getMockInstamartProducts(query);
     } catch (error) {
-      console.error('Error parsing Instamart HTML:', error);
+      console.error('[ProductScraper] Error parsing Instamart HTML:', error);
       return this.getMockInstamartProducts(query);
     }
   }
   
   // Mock data methods
   private getMockZeptoProducts(query: string): ScrapedResult[] {
-    console.log('Using mock Zepto products');
+    console.log('[ProductScraper] Using mock Zepto products');
     return [
       {
         name: "Daawat Hyderabadi Biryani Kit (Biryani Kit)",
@@ -348,7 +357,7 @@ export class ProductScraper {
   }
   
   private getMockBlinkitProducts(query: string): ScrapedResult[] {
-    console.log('Using mock Blinkit products');
+    console.log('[ProductScraper] Using mock Blinkit products');
     return [
       {
         name: "Daawat Rozana Basmati Rice Gold | Medium Grain",
@@ -396,7 +405,7 @@ export class ProductScraper {
   }
   
   private getMockInstamartProducts(query: string): ScrapedResult[] {
-    console.log('Using mock Instamart products');
+    console.log('[ProductScraper] Using mock Instamart products');
     return [
       {
         name: "Daawat Basmati Rice - Super",

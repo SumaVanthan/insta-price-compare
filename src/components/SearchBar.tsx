@@ -15,7 +15,10 @@ const SearchBar = ({ onSearch, isLoading }: SearchBarProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
+      console.log(`[SearchBar] Search initiated for: "${query.trim()}"`);
       onSearch(query.trim());
+    } else {
+      console.log('[SearchBar] Empty search query, not searching');
     }
   };
 
@@ -42,6 +45,11 @@ const SearchBar = ({ onSearch, isLoading }: SearchBarProps) => {
               size="sm" 
               className="rounded-xl transition-apple h-10"
               disabled={isLoading || !query.trim()}
+              onClick={() => {
+                if (!isLoading && query.trim()) {
+                  console.log(`[SearchBar] Search button clicked for: "${query.trim()}"`);
+                }
+              }}
             >
               {isLoading ? (
                 <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
