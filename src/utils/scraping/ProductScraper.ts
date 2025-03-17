@@ -1,6 +1,7 @@
+
 import { ScrapedResult } from '../types';
 import { ScraperClient } from './ScraperClient';
-import cheerio from 'cheerio';
+import * as cheerio from 'cheerio';
 
 export class ProductScraper {
   private client: ScraperClient;
