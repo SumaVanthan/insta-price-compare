@@ -133,7 +133,7 @@ export class ProductScraper {
         '.plp-products > div'
       ];
       
-      let productElements: cheerio.Element[] = [];
+      let productElements: any[] = [];
       
       // Try each selector until we find products
       for (const selector of productSelectors) {
@@ -232,7 +232,7 @@ export class ProductScraper {
         '.search-items-container > div'
       ];
       
-      let productElements: cheerio.Element[] = [];
+      let productElements: any[] = [];
       
       // Try each selector until we find products
       for (const selector of productSelectors) {
