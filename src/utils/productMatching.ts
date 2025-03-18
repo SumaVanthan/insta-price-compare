@@ -5,7 +5,7 @@ import { areProductsSimilar } from './stringComparison';
 import { extractPrice } from './priceUtils';
 
 /**
- * Process and merge product data from multiple platforms based on 80% similarity threshold
+ * Process and merge product data from multiple platforms based on 60% similarity threshold
  */
 export function mergeProducts(
   zeptoProducts: ScrapedResult[], 
@@ -41,10 +41,69 @@ export function mergeProducts(
   // Sort products by name for more deterministic grouping
   allProducts.sort((a, b) => a.name.localeCompare(b.name));
   
-  // For each product, find similar products across platforms
+  // First pass: find exact name matches
+  const exactMatches = new Map<string, ScrapedResult[]>();
+  
+  allProducts.forEach(product => {
+    const normalizedName = product.name.toLowerCase().trim();
+    if (!exactMatches.has(normalizedName)) {
+      exactMatches.set(normalizedName, []);
+    }
+    exactMatches.get(normalizedName)?.push(product);
+  });
+  
+  // Process exact matches first
+  exactMatches.forEach((products, normalizedName) => {
+    if (products.length > 1) {
+      console.log(`Found ${products.length} exact matches for ${normalizedName}`);
+      
+      // Create a merged product data object
+      const firstProduct = products[0];
+      const productData: ProductData = {
+        id: `product-${mergedProducts.length}`,
+        name: firstProduct.name,
+        imageUrl: firstProduct.imageUrl || '/placeholder.svg',
+        prices: {},
+        unit: firstProduct.unit || '',
+        sources: products.map(p => p.source as string)
+      };
+      
+      // Add prices from each platform
+      products.forEach(product => {
+        const platform = product.source as keyof ProductData['prices'];
+        
+        productData.prices[platform] = {
+          price: product.price,
+          unit: product.unit,
+          url: product.url
+        };
+        
+        // Mark this product as processed
+        processedProducts.add(product.name);
+      });
+      
+      // For platforms without this product, add "Not available"
+      const availablePlatforms = new Set(products.map(p => p.source));
+      const allPlatforms = ['zepto', 'blinkit', 'instamart'];
+      
+      allPlatforms.forEach(platform => {
+        if (!availablePlatforms.has(platform)) {
+          productData.prices[platform as keyof ProductData['prices']] = {
+            price: 'Not available',
+            unit: '',
+            url: `https://${getPlatformBaseUrl(platform)}/search?q=${encodeURIComponent(query)}`
+          };
+        }
+      });
+      
+      mergedProducts.push(productData);
+    }
+  });
+  
+  // Second pass: find similar products for those not already processed
   for (const product of allProducts) {
-    // Skip if this product name has been processed
-    if (isProductProcessed(product.name, processedProducts)) {
+    // Skip if this product name has been processed in exact matches
+    if (processedProducts.has(product.name)) {
       continue;
     }
     
@@ -52,7 +111,7 @@ export function mergeProducts(
     
     // Find all similar products across all platforms
     const similarProducts = allProducts.filter(p => 
-      !isProductProcessed(p.name, processedProducts) && 
+      !processedProducts.has(p.name) && 
       (p === product || areProductsSimilar(p.name, product.name))
     );
     
@@ -64,7 +123,7 @@ export function mergeProducts(
       name: product.name, // Use the first product's name
       imageUrl: product.imageUrl || '/placeholder.svg',
       prices: {},
-      unit: product.unit, // Use the first product's unit
+      unit: product.unit || '', // Use the first product's unit
       sources: similarProducts.map(p => p.source as string)
     };
     

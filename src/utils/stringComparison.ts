@@ -1,72 +1,70 @@
 
+import { stringSimilarity } from './string_similarity';
+
 /**
- * Calculate string similarity between two strings
- * Uses Levenshtein distance algorithm
- * Returns a value between 0 and 1, where 1 means identical
+ * Calculate the similarity between two product names, making adjustments for common
+ * variations in how products might be listed
  */
-export function stringSimilarity(s1: string, s2: string): number {
-  // If either string is empty, return 0
-  if (s1.length === 0 || s2.length === 0) {
-    return 0;
-  }
+export function areProductsSimilar(name1: string, name2: string): boolean {
+  // Simple pre-processing to normalize strings
+  const normalizedName1 = normalizeProductName(name1);
+  const normalizedName2 = normalizeProductName(name2);
   
-  // If strings are identical, return 1
-  if (s1 === s2) {
-    return 1;
-  }
+  // Calculate similarity score
+  const similarityScore = calculateSimilarity(normalizedName1, normalizedName2);
   
-  // Normalize strings for better comparison
-  const normalize = (str: string): string => {
-    return str
-      .toLowerCase()
-      .replace(/[^\w\s]/g, '') // Remove punctuation
-      .replace(/\s+/g, ' ')    // Normalize whitespace
-      .trim();
-  };
+  // Debug log for monitoring matches
+  console.log(`Comparing "${name1}" with "${name2}": ${similarityScore * 100}% similarity`);
   
-  const normalizedS1 = normalize(s1);
-  const normalizedS2 = normalize(s2);
-  
-  // If normalized strings are identical, return 0.95 (high but not perfect match)
-  if (normalizedS1 === normalizedS2) {
-    return 0.95;
-  }
-  
-  // Calculate Levenshtein distance
-  const track = Array(normalizedS2.length + 1).fill(null).map(() => 
-    Array(normalizedS1.length + 1).fill(null));
-  
-  for (let i = 0; i <= normalizedS1.length; i += 1) {
-    track[0][i] = i;
-  }
-  
-  for (let j = 0; j <= normalizedS2.length; j += 1) {
-    track[j][0] = j;
-  }
-  
-  for (let j = 1; j <= normalizedS2.length; j += 1) {
-    for (let i = 1; i <= normalizedS1.length; i += 1) {
-      const indicator = normalizedS1[i - 1] === normalizedS2[j - 1] ? 0 : 1;
-      track[j][i] = Math.min(
-        track[j][i - 1] + 1, // deletion
-        track[j - 1][i] + 1, // insertion
-        track[j - 1][i - 1] + indicator, // substitution
-      );
-    }
-  }
-  
-  // Calculate similarity based on the Levenshtein distance
-  const maxLength = Math.max(normalizedS1.length, normalizedS2.length);
-  if (maxLength === 0) return 1; // Both strings are empty after normalization
-  
-  const distance = track[normalizedS2.length][normalizedS1.length];
-  return 1 - (distance / maxLength);
+  // Products are similar if similarity score is >= 60%
+  // Lowered from 80% to catch more matches
+  return similarityScore >= 0.6;
 }
 
-// Export a function to check if two product names are similar enough (80% threshold)
-export function areProductsSimilar(name1: string, name2: string): boolean {
-  const similarityThreshold = 0.8; // 80% similarity threshold as requested
-  const similarity = stringSimilarity(name1, name2);
-  console.log(`Comparing "${name1}" with "${name2}": ${similarity * 100}% similarity`);
-  return similarity >= similarityThreshold;
+/**
+ * Normalize product names by removing common words, standardizing format, etc.
+ */
+function normalizeProductName(name: string): string {
+  // Convert to lowercase
+  let normalized = name.toLowerCase();
+  
+  // Remove brand indicators
+  normalized = normalized.replace(/\(.*?\)/g, '');
+  
+  // Remove common suffixes that don't help in matching
+  const suffixesToRemove = [
+    '- set of', '- pack of', 'combo', 'pack', 'family pack', 'value pack',
+    'jumbo pack', 'mini pack', 'super saver', 'saver pack'
+  ];
+  
+  suffixesToRemove.forEach(suffix => {
+    normalized = normalized.replace(new RegExp(`\\s*${suffix}.*$`, 'i'), '');
+  });
+  
+  // Remove common words that don't help in matching
+  const wordsToRemove = [
+    'premium', 'special', 'fresh', 'natural', 'organic', 'authentic',
+    'traditional', 'homemade', 'gourmet', 'classic', 'regular', 'new',
+    'improved', 'super', 'mega', 'mini', 'large', 'small', 'medium',
+    'free', 'bundle', 'kit', 'set', 'value'
+  ];
+  
+  const words = normalized.split(/\s+/);
+  const filteredWords = words.filter(word => 
+    !wordsToRemove.includes(word) && word.length > 1
+  );
+  
+  normalized = filteredWords.join(' ');
+  
+  // Trim any excess whitespace
+  normalized = normalized.trim();
+  
+  return normalized;
+}
+
+/**
+ * Calculate string similarity using the string_similarity library
+ */
+function calculateSimilarity(str1: string, str2: string): number {
+  return stringSimilarity(str1, str2);
 }
