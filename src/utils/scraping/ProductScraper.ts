@@ -1,12 +1,14 @@
 
 import { ScrapedResult } from '../types';
-import { scraperClient } from './ScraperClient';
+import { ScraperClient } from './ScraperClient';
 
 export class ProductScraper {
   private timeout: number;
+  private scraperClient: ScraperClient;
 
   constructor(timeout: number = 8000) {
     this.timeout = timeout;
+    this.scraperClient = new ScraperClient(timeout);
     console.log(`[ProductScraper] Initialized with timeout: ${timeout}ms`);
   }
 
@@ -18,7 +20,12 @@ export class ProductScraper {
       console.log(`[ProductScraper] Scraping Zepto for "${query}"...`);
       const url = `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`;
       
-      const $ = await scraperClient.fetch(url, this.timeout);
+      const result = await this.scraperClient.fetch(url);
+      if (!result.success || !result.data) {
+        throw new Error(`Failed to fetch Zepto data: ${result.error}`);
+      }
+      
+      const $ = result.data;
       console.log(`[ProductScraper] Successfully fetched Zepto HTML`);
       
       // Selectors for product elements
@@ -151,7 +158,12 @@ export class ProductScraper {
       console.log(`[ProductScraper] Scraping Blinkit for "${query}"...`);
       const url = `https://blinkit.com/s/?q=${encodeURIComponent(query)}`;
       
-      const $ = await scraperClient.fetch(url, this.timeout);
+      const result = await this.scraperClient.fetch(url);
+      if (!result.success || !result.data) {
+        throw new Error(`Failed to fetch Blinkit data: ${result.error}`);
+      }
+      
+      const $ = result.data;
       console.log(`[ProductScraper] Successfully fetched Blinkit HTML`);
       
       // Selectors for product elements
@@ -282,7 +294,12 @@ export class ProductScraper {
       console.log(`[ProductScraper] Scraping Instamart for "${query}"...`);
       const url = `https://www.swiggy.com/instamart/search?custom_back=true&query=${encodeURIComponent(query)}`;
       
-      const $ = await scraperClient.fetch(url, this.timeout);
+      const result = await this.scraperClient.fetch(url);
+      if (!result.success || !result.data) {
+        throw new Error(`Failed to fetch Instamart data: ${result.error}`);
+      }
+      
+      const $ = result.data;
       console.log(`[ProductScraper] Successfully fetched Instamart HTML`);
       
       // Selectors for product elements
