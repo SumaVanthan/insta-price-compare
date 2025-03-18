@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Layout from '@/components/Layout';
@@ -24,15 +25,18 @@ const Index = () => {
     let timeoutId: NodeJS.Timeout;
     
     if (isLoading) {
+      // Set a timeout for the search
       timeoutId = setTimeout(() => {
-        setIsLoading(false);
-        setError('Search timed out. Please try again or try a different search term.');
-        toast({
-          title: "Search timed out",
-          description: "Our search is taking too long. Please try again or try a different search term.",
-          variant: "destructive",
-          duration: 5000,
-        });
+        if (isLoading) {  // Check if still loading
+          setIsLoading(false);
+          setError('Search timed out. Please try again or try a different search term.');
+          toast({
+            title: "Search timed out",
+            description: "Our search is taking too long. Please try again or try a different search term.",
+            variant: "destructive",
+            duration: 5000,
+          });
+        }
       }, 20000); // 20 seconds timeout
     }
     
@@ -42,7 +46,14 @@ const Index = () => {
   }, [isLoading, toast]);
 
   const handleLocationGranted = (coords: { latitude: number; longitude: number }) => {
+    console.log('Location granted:', coords);
     setLocation(coords);
+    
+    // Show toast to inform user
+    toast({
+      title: "Location accessed",
+      description: "We can now show you local prices.",
+    });
   };
 
   const handleSearch = async (query: string) => {
@@ -62,16 +73,12 @@ const Index = () => {
     setSearchStartTime(Date.now());
     setCurrentQuery(query);
     
-    console.log(`Starting search for "${query}"`);
+    console.log(`Starting search for "${query}" at location: ${location.latitude}, ${location.longitude}`);
     
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-      
       const result = await searchProducts(query, location);
-      clearTimeout(timeoutId);
       
-      if (isLoading) {
+      if (isLoading) { // Make sure we're still in loading state (not cancelled)
         setProducts(result.products);
         console.log(`Search completed with ${result.products.length} products`);
         
@@ -84,7 +91,7 @@ const Index = () => {
         }
       }
     } catch (err) {
-      if (isLoading) {
+      if (isLoading) { // Make sure we're still in loading state (not cancelled)
         const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
         console.error(`Search error: ${errorMessage}`);
         
@@ -150,7 +157,7 @@ const Index = () => {
         
         <LocationPermission onLocationGranted={handleLocationGranted} />
         
-        <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+        <SearchBar onSearch={handleSearch} isLoading={isLoading} locationGranted={!!location} />
         
         <AnimatePresence mode="wait">
           {isLoading ? (
@@ -198,6 +205,7 @@ const Index = () => {
                       transition: { delay: 0.5 + (index * 0.1) }
                     }}
                     onClick={() => handleSearch(suggestion)}
+                    disabled={!location}
                   >
                     {suggestion}
                   </motion.button>

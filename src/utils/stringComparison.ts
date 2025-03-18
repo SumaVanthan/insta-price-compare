@@ -62,3 +62,11 @@ export function stringSimilarity(s1: string, s2: string): number {
   const distance = track[normalizedS2.length][normalizedS1.length];
   return 1 - (distance / maxLength);
 }
+
+// Export a function to check if two product names are similar enough (80% threshold)
+export function areProductsSimilar(name1: string, name2: string): boolean {
+  const similarityThreshold = 0.8; // 80% similarity threshold as requested
+  const similarity = stringSimilarity(name1, name2);
+  console.log(`Comparing "${name1}" with "${name2}": ${similarity * 100}% similarity`);
+  return similarity >= similarityThreshold;
+}

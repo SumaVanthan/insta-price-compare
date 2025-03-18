@@ -1,36 +1,33 @@
 
 import { ScrapedResult } from '../types';
-import { ScraperClient } from './ScraperClient';
-import * as cheerio from 'cheerio';
+import { scraperClient } from './ScraperClient';
 
 export class ProductScraper {
-  private client: ScraperClient;
-  
+  private timeout: number;
+
   constructor(timeout: number = 8000) {
-    this.client = new ScraperClient(timeout);
+    this.timeout = timeout;
+    console.log(`[ProductScraper] Initialized with timeout: ${timeout}ms`);
   }
-  
+
+  /**
+   * Scrape Zepto products based on search query
+   */
   async scrapeZeptoProducts(query: string): Promise<ScrapedResult[]> {
-    console.log(`[ProductScraper] Starting Zepto scrape for query: "${query}"`);
-    const searchUrl = `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`;
-    const result = await this.client.fetch(searchUrl);
-    
-    if (!result.success) {
-      console.error(`[ProductScraper] Failed to scrape Zepto: ${result.error}`);
-      console.log(`[ProductScraper] Falling back to mock Zepto data for "${query}"`);
-      return this.getMockZeptoProducts(query);
-    }
-    
     try {
-      const html = result.data;
-      const $ = cheerio.load(html);
-      const products: ScrapedResult[] = [];
+      console.log(`[ProductScraper] Scraping Zepto for "${query}"...`);
+      const url = `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`;
       
-      // Multiple selectors for product cards
+      const $ = await scraperClient.fetch(url, this.timeout);
+      console.log(`[ProductScraper] Successfully fetched Zepto HTML`);
+      
+      // Selectors for product elements
       const productSelectors = [
         'div[data-testid="product-card"]', 
         '[class*="ProductCard"]', 
-        '[class*="product-card"]',
+        '[class*="product-card"]', 
+        '.product-item', 
+        '.product-container',
         '.items-container > div'
       ];
       
@@ -38,98 +35,130 @@ export class ProductScraper {
       
       // Try each selector until we find products
       for (const selector of productSelectors) {
-        productElements = $(selector).toArray();
-        if (productElements.length > 0) {
-          console.log(`[ProductScraper] Found ${productElements.length} Zepto products with selector: ${selector}`);
+        const elements = $(selector).toArray();
+        if (elements.length > 0) {
+          console.log(`[ProductScraper] Found ${elements.length} Zepto products with selector: ${selector}`);
+          productElements = elements;
           break;
         }
       }
       
+      // If no products found with specific selectors, try a more generic approach
       if (productElements.length === 0) {
-        console.log('[ProductScraper] No Zepto products found in HTML, using mock data');
-        return this.getMockZeptoProducts(query);
+        console.log('[ProductScraper] No products found with specific selectors, trying generic approach');
+        const allDivs = $('div').toArray();
+        productElements = allDivs.filter(el => {
+          const html = $(el).html() || '';
+          // Look for divs that likely contain product info
+          return (html.includes('price') || html.includes('₹') || html.includes('rs')) && 
+                 (html.includes('kg') || html.includes('g') || html.includes('ml') || html.includes('l'));
+        });
+        console.log(`[ProductScraper] Found ${productElements.length} potential Zepto products with generic approach`);
       }
       
-      // Extract product data using cheerio
-      productElements.forEach((element, index) => {
+      if (productElements.length === 0) {
+        console.log('[ProductScraper] No Zepto products found, returning empty array');
+        return [];
+      }
+      
+      // Extract product information
+      const products: ScrapedResult[] = [];
+      
+      productElements.forEach((el, index) => {
         try {
-          const $el = $(element);
+          const $el = $(el);
           
-          // Extract image
+          // Extract product name
+          let name = '';
+          const nameSelectors = ['h3', 'h2', '[class*="name"]', '[class*="title"]'];
+          for (const selector of nameSelectors) {
+            const text = $el.find(selector).first().text().trim();
+            if (text) {
+              name = text;
+              break;
+            }
+          }
+          
+          // Extract product price
+          let price = '';
+          const priceSelectors = ['[class*="price"]', '[class*="amount"]'];
+          for (const selector of priceSelectors) {
+            const text = $el.find(selector).first().text().trim();
+            if (text && (text.includes('₹') || text.includes('Rs'))) {
+              price = text;
+              break;
+            }
+          }
+          
+          // Extract product unit/quantity
+          let unit = '';
+          const unitSelectors = ['[class*="weight"]', '[class*="quantity"]', '[class*="unit"]'];
+          for (const selector of unitSelectors) {
+            const text = $el.find(selector).first().text().trim();
+            if (text) {
+              unit = text;
+              break;
+            }
+          }
+          
+          // Extract product URL
+          let url = '';
+          const anchor = $el.find('a').first();
+          if (anchor.length) {
+            const href = anchor.attr('href');
+            if (href) {
+              url = href.startsWith('http') ? href : `https://www.zeptonow.com${href.startsWith('/') ? '' : '/'}${href}`;
+            }
+          }
+          
+          // Extract image URL
           let imageUrl = '';
           const img = $el.find('img').first();
-          imageUrl = img.attr('src') || img.attr('data-src') || '';
-          
-          if (!imageUrl || imageUrl.includes('data:image')) {
-            imageUrl = 'https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png';
+          if (img.length) {
+            imageUrl = img.attr('src') || img.attr('data-src') || '';
           }
           
-          // Extract name
-          const name = $el.find('h3, h2, [class*="name"], [class*="title"]').first().text().trim() 
-            || `Product ${index + 1}`;
-          
-          // Extract price
-          let price = '';
-          const priceElement = $el.find('[class*="price"], [class*="Price"]').first();
-          price = priceElement.text().trim() || 'Price not available';
-          
-          // Extract unit
-          let unit = '';
-          const unitElement = $el.find('[class*="weight"], [class*="unit"], [class*="quantity"]').first();
-          unit = unitElement.text().trim() || '';
-          
-          // Extract URL
-          let url = '';
-          const linkElement = $el.find('a').first();
-          url = linkElement.attr('href') || '';
-          
-          if (url && !url.startsWith('http')) {
-            url = `https://www.zeptonow.com${url.startsWith('/') ? '' : '/'}${url}`;
-          } else if (!url) {
-            url = searchUrl;
+          if (name || price) {
+            products.push({
+              name: name || `Zepto Product ${index + 1}`,
+              price: price || 'Price not available',
+              unit: unit || '',
+              url: url || `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`,
+              imageUrl: imageUrl || 'https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png',
+              source: 'zepto'
+            });
           }
-          
-          products.push({
-            name,
-            price,
-            imageUrl,
-            unit,
-            url
-          });
         } catch (err) {
-          console.error(`[ProductScraper] Error extracting Zepto product data:`, err);
+          console.error(`[ProductScraper] Error extracting Zepto product #${index}:`, err);
         }
       });
       
       console.log(`[ProductScraper] Successfully extracted ${products.length} Zepto products`);
-      return products.length > 0 ? products : this.getMockZeptoProducts(query);
+      return products;
+      
     } catch (error) {
-      console.error('[ProductScraper] Error parsing Zepto HTML:', error);
+      console.error('[ProductScraper] Failed to scrape Zepto:', error);
+      console.log('[ProductScraper] Falling back to mock Zepto data for', query);
       return this.getMockZeptoProducts(query);
     }
   }
   
+  /**
+   * Scrape Blinkit products based on search query
+   */
   async scrapeBlinkitProducts(query: string): Promise<ScrapedResult[]> {
-    console.log(`[ProductScraper] Starting Blinkit scrape for query: "${query}"`);
-    const searchUrl = `https://blinkit.com/s/?q=${encodeURIComponent(query)}`;
-    const result = await this.client.fetch(searchUrl);
-    
-    if (!result.success) {
-      console.error(`[ProductScraper] Failed to scrape Blinkit: ${result.error}`);
-      console.log(`[ProductScraper] Falling back to mock Blinkit data for "${query}"`);
-      return this.getMockBlinkitProducts(query);
-    }
-    
     try {
-      const html = result.data;
-      const $ = cheerio.load(html);
-      const products: ScrapedResult[] = [];
+      console.log(`[ProductScraper] Scraping Blinkit for "${query}"...`);
+      const url = `https://blinkit.com/s/?q=${encodeURIComponent(query)}`;
       
-      // Multiple selectors for product cards
+      const $ = await scraperClient.fetch(url, this.timeout);
+      console.log(`[ProductScraper] Successfully fetched Blinkit HTML`);
+      
+      // Selectors for product elements
       const productSelectors = [
         'div[data-testid="product-card"]', 
         '[class*="product-card"]', 
-        '[class*="ProductCard"]',
+        '[class*="plp-product"]',
         '.plp-products > div'
       ];
       
@@ -137,94 +166,126 @@ export class ProductScraper {
       
       // Try each selector until we find products
       for (const selector of productSelectors) {
-        productElements = $(selector).toArray();
-        if (productElements.length > 0) {
-          console.log(`[ProductScraper] Found ${productElements.length} Blinkit products with selector: ${selector}`);
+        const elements = $(selector).toArray();
+        if (elements.length > 0) {
+          console.log(`[ProductScraper] Found ${elements.length} Blinkit products with selector: ${selector}`);
+          productElements = elements;
           break;
         }
       }
       
+      // If no products found with specific selectors, try a more generic approach
       if (productElements.length === 0) {
-        console.log('[ProductScraper] No Blinkit products found in HTML, using mock data');
-        return this.getMockBlinkitProducts(query);
+        console.log('[ProductScraper] No products found with specific selectors, trying generic approach');
+        const allDivs = $('div').toArray();
+        productElements = allDivs.filter(el => {
+          const html = $(el).html() || '';
+          // Look for divs that likely contain product info
+          return (html.includes('price') || html.includes('₹') || html.includes('rs')) && 
+                 (html.includes('kg') || html.includes('g') || html.includes('ml') || html.includes('l'));
+        });
+        console.log(`[ProductScraper] Found ${productElements.length} potential Blinkit products with generic approach`);
       }
       
-      // Extract product data using cheerio
-      productElements.forEach((element, index) => {
+      if (productElements.length === 0) {
+        console.log('[ProductScraper] No Blinkit products found, returning empty array');
+        return [];
+      }
+      
+      // Extract product information
+      const products: ScrapedResult[] = [];
+      
+      productElements.forEach((el, index) => {
         try {
-          const $el = $(element);
+          const $el = $(el);
           
-          // Extract image
+          // Extract product name
+          let name = '';
+          const nameSelectors = ['h3', 'h2', '[class*="name"]', '[class*="title"]'];
+          for (const selector of nameSelectors) {
+            const text = $el.find(selector).first().text().trim();
+            if (text) {
+              name = text;
+              break;
+            }
+          }
+          
+          // Extract product price
+          let price = '';
+          const priceSelectors = ['[class*="price"]', '[class*="amount"]'];
+          for (const selector of priceSelectors) {
+            const text = $el.find(selector).first().text().trim();
+            if (text && (text.includes('₹') || text.includes('Rs'))) {
+              price = text;
+              break;
+            }
+          }
+          
+          // Extract product unit/quantity
+          let unit = '';
+          const unitSelectors = ['[class*="weight"]', '[class*="quantity"]', '[class*="unit"]'];
+          for (const selector of unitSelectors) {
+            const text = $el.find(selector).first().text().trim();
+            if (text) {
+              unit = text;
+              break;
+            }
+          }
+          
+          // Extract product URL
+          let url = '';
+          const anchor = $el.find('a').first();
+          if (anchor.length) {
+            const href = anchor.attr('href');
+            if (href) {
+              url = href.startsWith('http') ? href : `https://blinkit.com${href.startsWith('/') ? '' : '/'}${href}`;
+            }
+          }
+          
+          // Extract image URL
           let imageUrl = '';
           const img = $el.find('img').first();
-          imageUrl = img.attr('src') || img.attr('data-src') || '';
-          
-          if (!imageUrl || imageUrl.includes('data:image')) {
-            imageUrl = 'https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png';
+          if (img.length) {
+            imageUrl = img.attr('src') || img.attr('data-src') || '';
           }
           
-          // Extract name
-          const name = $el.find('h3, h2, [class*="name"], [class*="title"]').first().text().trim() 
-            || `Product ${index + 1}`;
-          
-          // Extract price
-          let price = '';
-          const priceElement = $el.find('[class*="price"], [class*="Price"]').first();
-          price = priceElement.text().trim() || 'Price not available';
-          
-          // Extract unit
-          let unit = '';
-          const unitElement = $el.find('[class*="weight"], [class*="unit"], [class*="quantity"]').first();
-          unit = unitElement.text().trim() || '';
-          
-          // Extract URL
-          let url = '';
-          const linkElement = $el.find('a').first();
-          url = linkElement.attr('href') || '';
-          
-          if (url && !url.startsWith('http')) {
-            url = `https://blinkit.com${url.startsWith('/') ? '' : '/'}${url}`;
-          } else if (!url) {
-            url = searchUrl;
+          if (name || price) {
+            products.push({
+              name: name || `Blinkit Product ${index + 1}`,
+              price: price || 'Price not available',
+              unit: unit || '',
+              url: url || `https://blinkit.com/s/?q=${encodeURIComponent(query)}`,
+              imageUrl: imageUrl || 'https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png',
+              source: 'blinkit'
+            });
           }
-          
-          products.push({
-            name,
-            price,
-            imageUrl,
-            unit,
-            url
-          });
         } catch (err) {
-          console.error(`[ProductScraper] Error extracting Blinkit product data:`, err);
+          console.error(`[ProductScraper] Error extracting Blinkit product #${index}:`, err);
         }
       });
       
       console.log(`[ProductScraper] Successfully extracted ${products.length} Blinkit products`);
-      return products.length > 0 ? products : this.getMockBlinkitProducts(query);
+      return products;
+      
     } catch (error) {
-      console.error('[ProductScraper] Error parsing Blinkit HTML:', error);
+      console.error('[ProductScraper] Failed to scrape Blinkit:', error);
+      console.log('[ProductScraper] Falling back to mock Blinkit data for', query);
       return this.getMockBlinkitProducts(query);
     }
   }
   
+  /**
+   * Scrape Instamart products based on search query
+   */
   async scrapeInstamartProducts(query: string): Promise<ScrapedResult[]> {
-    console.log(`[ProductScraper] Starting Instamart scrape for query: "${query}"`);
-    const searchUrl = `https://www.swiggy.com/instamart/search?custom_back=true&query=${encodeURIComponent(query)}`;
-    const result = await this.client.fetch(searchUrl);
-    
-    if (!result.success) {
-      console.error(`[ProductScraper] Failed to scrape Instamart: ${result.error}`);
-      console.log(`[ProductScraper] Falling back to mock Instamart data for "${query}"`);
-      return this.getMockInstamartProducts(query);
-    }
-    
     try {
-      const html = result.data;
-      const $ = cheerio.load(html);
-      const products: ScrapedResult[] = [];
+      console.log(`[ProductScraper] Scraping Instamart for "${query}"...`);
+      const url = `https://www.swiggy.com/instamart/search?custom_back=true&query=${encodeURIComponent(query)}`;
       
-      // Multiple selectors for product cards
+      const $ = await scraperClient.fetch(url, this.timeout);
+      console.log(`[ProductScraper] Successfully fetched Instamart HTML`);
+      
+      // Selectors for product elements
       const productSelectors = [
         '[class*="ProductCard"]', 
         '[class*="product-card"]', 
@@ -236,218 +297,209 @@ export class ProductScraper {
       
       // Try each selector until we find products
       for (const selector of productSelectors) {
-        productElements = $(selector).toArray();
-        if (productElements.length > 0) {
-          console.log(`[ProductScraper] Found ${productElements.length} Instamart products with selector: ${selector}`);
+        const elements = $(selector).toArray();
+        if (elements.length > 0) {
+          console.log(`[ProductScraper] Found ${elements.length} Instamart products with selector: ${selector}`);
+          productElements = elements;
           break;
         }
       }
       
+      // If no products found with specific selectors, try a more generic approach
       if (productElements.length === 0) {
-        console.log('[ProductScraper] No Instamart products found in HTML, using mock data');
-        return this.getMockInstamartProducts(query);
+        console.log('[ProductScraper] No products found with specific selectors, trying generic approach');
+        const allDivs = $('div').toArray();
+        productElements = allDivs.filter(el => {
+          const html = $(el).html() || '';
+          // Look for divs that likely contain product info
+          return (html.includes('price') || html.includes('₹') || html.includes('rs')) && 
+                 (html.includes('kg') || html.includes('g') || html.includes('ml') || html.includes('l'));
+        });
+        console.log(`[ProductScraper] Found ${productElements.length} potential Instamart products with generic approach`);
       }
       
-      // Extract product data using cheerio
-      productElements.forEach((element, index) => {
+      if (productElements.length === 0) {
+        console.log('[ProductScraper] No Instamart products found, returning empty array');
+        return [];
+      }
+      
+      // Extract product information
+      const products: ScrapedResult[] = [];
+      
+      productElements.forEach((el, index) => {
         try {
-          const $el = $(element);
+          const $el = $(el);
           
-          // Extract image
+          // Extract product name
+          let name = '';
+          const nameSelectors = ['h3', 'h2', '[class*="name"]', '[class*="title"]'];
+          for (const selector of nameSelectors) {
+            const text = $el.find(selector).first().text().trim();
+            if (text) {
+              name = text;
+              break;
+            }
+          }
+          
+          // Extract product price
+          let price = '';
+          const priceSelectors = ['[class*="price"]', '[class*="amount"]'];
+          for (const selector of priceSelectors) {
+            const text = $el.find(selector).first().text().trim();
+            if (text && (text.includes('₹') || text.includes('Rs'))) {
+              price = text;
+              break;
+            }
+          }
+          
+          // Extract product unit/quantity
+          let unit = '';
+          const unitSelectors = ['[class*="weight"]', '[class*="quantity"]', '[class*="unit"]'];
+          for (const selector of unitSelectors) {
+            const text = $el.find(selector).first().text().trim();
+            if (text) {
+              unit = text;
+              break;
+            }
+          }
+          
+          // Extract product URL
+          let url = '';
+          const anchor = $el.find('a').first();
+          if (anchor.length) {
+            const href = anchor.attr('href');
+            if (href) {
+              url = href.startsWith('http') ? href : `https://www.swiggy.com${href.startsWith('/') ? '' : '/'}${href}`;
+            }
+          }
+          
+          // Extract image URL
           let imageUrl = '';
           const img = $el.find('img').first();
-          imageUrl = img.attr('src') || img.attr('data-src') || '';
-          
-          if (!imageUrl || imageUrl.includes('data:image')) {
-            imageUrl = 'https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg';
+          if (img.length) {
+            imageUrl = img.attr('src') || img.attr('data-src') || '';
           }
           
-          // Extract name
-          const name = $el.find('h3, h2, [class*="name"], [class*="title"]').first().text().trim() 
-            || `Product ${index + 1}`;
-          
-          // Extract price
-          let price = '';
-          const priceElement = $el.find('[class*="price"], [class*="Price"]').first();
-          price = priceElement.text().trim() || 'Price not available';
-          
-          // Extract unit
-          let unit = '';
-          const unitElement = $el.find('[class*="weight"], [class*="unit"], [class*="quantity"]').first();
-          unit = unitElement.text().trim() || '';
-          
-          // Extract URL
-          let url = '';
-          const linkElement = $el.find('a').first();
-          url = linkElement.attr('href') || '';
-          
-          if (url && !url.startsWith('http')) {
-            url = `https://www.swiggy.com${url.startsWith('/') ? '' : '/'}${url}`;
-          } else if (!url) {
-            url = searchUrl;
+          if (name || price) {
+            products.push({
+              name: name || `Instamart Product ${index + 1}`,
+              price: price || 'Price not available',
+              unit: unit || '',
+              url: url || `https://www.swiggy.com/instamart/search?query=${encodeURIComponent(query)}`,
+              imageUrl: imageUrl || 'https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg',
+              source: 'instamart'
+            });
           }
-          
-          products.push({
-            name,
-            price,
-            imageUrl,
-            unit,
-            url
-          });
         } catch (err) {
-          console.error(`[ProductScraper] Error extracting Instamart product data:`, err);
+          console.error(`[ProductScraper] Error extracting Instamart product #${index}:`, err);
         }
       });
       
       console.log(`[ProductScraper] Successfully extracted ${products.length} Instamart products`);
-      return products.length > 0 ? products : this.getMockInstamartProducts(query);
+      return products;
+      
     } catch (error) {
-      console.error('[ProductScraper] Error parsing Instamart HTML:', error);
+      console.error('[ProductScraper] Failed to scrape Instamart:', error);
+      console.log('[ProductScraper] Falling back to mock Instamart data for', query);
       return this.getMockInstamartProducts(query);
     }
   }
   
-  // Mock data methods
+  /**
+   * Get mock Zepto products for testing or when scraping fails
+   */
   private getMockZeptoProducts(query: string): ScrapedResult[] {
     console.log('[ProductScraper] Using mock Zepto products');
     return [
       {
-        name: "Daawat Hyderabadi Biryani Kit (Biryani Kit)",
-        price: "₹140",
-        imageUrl: "https://cdn.zeptonow.com/production/_next/static/images/products/placeholder.png",
-        unit: "334 g",
-        url: `https://www.zeptonow.com/product/daawat-hyderabadi-biryani-kit`
+        name: "Daawat Basmati Rice - Super",
+        price: "₹159",
+        unit: "1 kg",
+        url: `https://www.zeptonow.com/product/daawat-basmati-rice-super`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png",
+        source: "zepto"
       },
       {
-        name: "VKR Sivaji Premium (Medium Grain) Boiled Ponni Rice 5 kg",
-        price: "₹398",
-        imageUrl: "https://cdn.zeptonow.com/production/_next/static/images/products/placeholder.png",
-        unit: "5 kg",
-        url: `https://www.zeptonow.com/product/vkr-sivaji-premium-medium-grain-boiled-ponni-rice-5-kg`
-      },
-      {
-        name: "Udhaiyam (Medium Grain) Idli Rice (Idli Arisi)",
-        price: "₹294",
-        imageUrl: "https://cdn.zeptonow.com/production/_next/static/images/products/placeholder.png",
-        unit: "5 kg",
-        url: `https://www.zeptonow.com/product/udhaiyam-medium-grain-idli-rice-idli-arisi`
-      },
-      {
-        name: "India Gate Classic Basmati Rice (Basmati)",
+        name: "India Gate Basmati Rice - Classic",
         price: "₹232",
-        imageUrl: "https://cdn.zeptonow.com/production/_next/static/images/products/placeholder.png",
         unit: "1 kg",
-        url: `https://www.zeptonow.com/product/india-gate-classic-basmati-rice-basmati`
+        url: `https://www.zeptonow.com/product/india-gate-basmati-rice-classic`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png",
+        source: "zepto"
       },
       {
-        name: "India Gate Everyday Basmati Rice (Basmati)",
-        price: "₹376",
-        imageUrl: "https://cdn.zeptonow.com/production/_next/static/images/products/placeholder.png",
-        unit: "5 kg",
-        url: `https://www.zeptonow.com/product/india-gate-everyday-basmati-rice-basmati`
-      },
-      {
-        name: "India Gate (Short Grain) Jeera Rice (Jeeragasamba Rice)",
-        price: "₹148",
-        imageUrl: "https://cdn.zeptonow.com/production/_next/static/images/products/placeholder.png",
+        name: "Fortune Everyday Basmati Rice",
+        price: "₹120",
         unit: "1 kg",
-        url: `https://www.zeptonow.com/product/india-gate-short-grain-jeera-rice-jeeragasamba-rice`
+        url: `https://www.zeptonow.com/product/fortune-everyday-basmati-rice`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png",
+        source: "zepto"
       }
     ];
   }
   
+  /**
+   * Get mock Blinkit products for testing or when scraping fails
+   */
   private getMockBlinkitProducts(query: string): ScrapedResult[] {
     console.log('[ProductScraper] Using mock Blinkit products');
     return [
       {
-        name: "Daawat Rozana Basmati Rice Gold | Medium Grain",
+        name: "Daawat Rozana Basmati Rice Gold",
         price: "₹423",
-        imageUrl: "https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=50,metadata=none,w=225/app/images/products/sliding_image/3/423.jpg",
         unit: "5 kg",
-        url: `https://blinkit.com/prn/daawat-rozana-basmati-rice-gold-medium-grain/prid/423`
+        url: `https://blinkit.com/prn/daawat-rozana-basmati-rice-gold/prid/423`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png",
+        source: "blinkit"
       },
       {
-        name: "India Gate All Rounder Feast Rozzana Basmati Rice",
-        price: "₹110",
-        imageUrl: "https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=50,metadata=none,w=225/app/images/products/sliding_image/110110/110.jpg",
+        name: "India Gate Basmati Rice - Classic",
+        price: "₹235",
         unit: "1 kg",
-        url: `https://blinkit.com/prn/india-gate-all-rounder-feast-rozzana-basmati-rice/prid/110110`
+        url: `https://blinkit.com/prn/india-gate-basmati-rice-classic/prid/235`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png",
+        source: "blinkit"
       },
       {
-        name: "Udhaiyam Ponni Rice 5 Kgs, Goldwinner Refined Sunflower Oil 1 Ltr, Udhaiyam Urad Dal 1 Kg",
-        price: "₹1186",
-        imageUrl: "https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=50,metadata=none,w=225/app/images/products/sliding_image/1186/1186.jpg",
-        unit: "3 Combo",
-        url: `https://blinkit.com/prn/udhaiyam-ponni-rice-5-kgs-goldwinner-refined-sunflower-oil-1-ltr-udhaiyam-urad-dal-1-kg/prid/1186`
-      },
-      {
-        name: "Smart One Ponni Steam Rice",
-        price: "₹499",
-        imageUrl: "https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=50,metadata=none,w=225/app/images/products/sliding_image/499/499.jpg",
-        unit: "10 kg",
-        url: `https://blinkit.com/prn/smart-one-ponni-steam-rice/prid/499`
-      },
-      {
-        name: "Smart One Kurnool Sona Masoori Raw Rice",
-        price: "₹1544",
-        imageUrl: "https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=50,metadata=none,w=225/app/images/products/sliding_image/1544/1544.jpg",
-        unit: "26 kg",
-        url: `https://blinkit.com/prn/smart-one-kurnool-sona-masoori-raw-rice/prid/1544`
-      },
-      {
-        name: "Popular Essentials Idli Rice",
-        price: "₹373",
-        imageUrl: "https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=50,metadata=none,w=225/app/images/products/sliding_image/373/373.jpg",
-        unit: "5 kg",
-        url: `https://blinkit.com/prn/popular-essentials-idli-rice/prid/373`
+        name: "Fortune Everyday Basmati Rice",
+        price: "₹118",
+        unit: "1 kg",
+        url: `https://blinkit.com/prn/fortune-everyday-basmati-rice/prid/118`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png",
+        source: "blinkit"
       }
     ];
   }
   
+  /**
+   * Get mock Instamart products for testing or when scraping fails
+   */
   private getMockInstamartProducts(query: string): ScrapedResult[] {
     console.log('[ProductScraper] Using mock Instamart products');
     return [
       {
         name: "Daawat Basmati Rice - Super",
-        price: "₹159",
-        imageUrl: "https://instamart-media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_1000/f5f68bbafa8f14fdbe85f7bfc0030e8b",
+        price: "₹160",
         unit: "1 kg",
-        url: `https://www.swiggy.com/instamart/product/daawat-basmati-rice-super`
-      },
-      {
-        name: "Sivaji Vkr Boiled Rice",
-        price: "₹1819",
-        imageUrl: "https://instamart-media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_1000/d5f68bbafa8f14fdbe85f7bfc0030e8b",
-        unit: "25 kg",
-        url: `https://www.swiggy.com/instamart/product/sivaji-vkr-boiled-rice`
-      },
-      {
-        name: "Supreme Harvest Ponni Raw Rice",
-        price: "₹66",
-        imageUrl: "https://instamart-media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_1000/c5f68bbafa8f14fdbe85f7bfc0030e8b",
-        unit: "1 kg",
-        url: `https://www.swiggy.com/instamart/product/supreme-harvest-ponni-raw-rice`
-      },
-      {
-        name: "Daawat Basmati Rice - Pulav",
-        price: "₹139",
-        imageUrl: "https://instamart-media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_1000/b5f68bbafa8f14fdbe85f7bfc0030e8b",
-        unit: "1 kg",
-        url: `https://www.swiggy.com/instamart/product/daawat-basmati-rice-pulav`
-      },
-      {
-        name: "Fortune Everyday Basmati Rice",
-        price: "₹125",
-        imageUrl: "https://instamart-media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_1000/a5f68bbafa8f14fdbe85f7bfc0030e8b",
-        unit: "1 kg",
-        url: `https://www.swiggy.com/instamart/product/fortune-everyday-basmati-rice`
+        url: `https://www.swiggy.com/instamart/product/daawat-basmati-rice-super`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg",
+        source: "instamart"
       },
       {
         name: "India Gate Classic Basmati Rice",
-        price: "₹232",
-        imageUrl: "https://instamart-media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_1000/e5f68bbafa8f14fdbe85f7bfc0030e8b",
+        price: "₹230",
         unit: "1 kg",
-        url: `https://www.swiggy.com/instamart/product/india-gate-classic-basmati-rice`
+        url: `https://www.swiggy.com/instamart/product/india-gate-classic-basmati-rice`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg",
+        source: "instamart"
+      },
+      {
+        name: "Fortune Basmati Rice",
+        price: "₹121",
+        unit: "1 kg",
+        url: `https://www.swiggy.com/instamart/product/fortune-basmati-rice`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg",
+        source: "instamart"
       }
     ];
   }

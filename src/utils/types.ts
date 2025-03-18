@@ -1,13 +1,15 @@
 
-import { ProductData } from '@/components/ProductCard';
-
 export interface ScrapedResult {
   name: string;
   price: string;
-  imageUrl: string;
   unit: string;
   url: string;
-  numericPrice?: number;
+  imageUrl: string;
+  source?: string;
+}
+
+export interface SearchResultResponse {
+  products: any[];
 }
 
 export interface PlatformInfo {
@@ -15,8 +17,4 @@ export interface PlatformInfo {
   logo: string;
   color: string;
   baseUrl: string;
-}
-
-export interface SearchResultResponse {
-  products: ProductData[];
 }

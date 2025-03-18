@@ -16,7 +16,7 @@ class ScraperService {
   async searchProducts(query: string, location: { latitude: number; longitude: number }) {
     console.log(`[ScraperService] Searching for "${query}" at location: ${location.latitude}, ${location.longitude}`);
     
-    // Check cache first
+    // Check cache first (cache by query and location)
     const cacheKey = `search:${query}:${location.latitude}:${location.longitude}`;
     const cached = this.getCachedResult(cacheKey);
     if (cached) {

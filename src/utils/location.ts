@@ -20,8 +20,10 @@ export const getLocation = (): Promise<Coordinates> => {
       return;
     }
 
+    console.log('Requesting geolocation permission...');
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        console.log('Geolocation permission granted, coordinates obtained');
         resolve({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -43,6 +45,7 @@ export const getLocation = (): Promise<Coordinates> => {
             break;
         }
         
+        console.error(`Geolocation error: ${message}`);
         reject({
           code: error.code,
           message
@@ -59,4 +62,29 @@ export const getLocation = (): Promise<Coordinates> => {
 
 export const formatLocation = (coordinates: Coordinates): string => {
   return `${coordinates.latitude.toFixed(4)}, ${coordinates.longitude.toFixed(4)}`;
+};
+
+// Store location in session storage
+export const storeLocation = (coordinates: Coordinates): void => {
+  try {
+    sessionStorage.setItem('userLocation', JSON.stringify(coordinates));
+    console.log('Location stored in session storage');
+  } catch (error) {
+    console.error('Failed to store location in session storage:', error);
+  }
+};
+
+// Retrieve location from session storage
+export const retrieveLocation = (): Coordinates | null => {
+  try {
+    const locationData = sessionStorage.getItem('userLocation');
+    if (locationData) {
+      console.log('Retrieved location from session storage');
+      return JSON.parse(locationData);
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to retrieve location from session storage:', error);
+    return null;
+  }
 };

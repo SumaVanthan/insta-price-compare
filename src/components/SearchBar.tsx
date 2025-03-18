@@ -1,25 +1,66 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ui/use-toast';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
   isLoading: boolean;
+  locationGranted: boolean;
 }
 
-const SearchBar = ({ onSearch, isLoading }: SearchBarProps) => {
+const POPULAR_SEARCHES = ['Milk', 'Rice', 'Bread', 'Eggs', 'Onion', 'Potato'];
+
+const SearchBar = ({ onSearch, isLoading, locationGranted }: SearchBarProps) => {
   const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const { toast } = useToast();
+
+  // Filter suggestions based on current query
+  useEffect(() => {
+    if (query.trim().length > 0) {
+      const filtered = POPULAR_SEARCHES.filter(item => 
+        item.toLowerCase().includes(query.toLowerCase())
+      );
+      setSuggestions(filtered);
+    } else {
+      setSuggestions(POPULAR_SEARCHES);
+    }
+  }, [query]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!locationGranted) {
+      toast({
+        title: "Location required",
+        description: "Please allow location access before searching.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (query.trim()) {
       console.log(`[SearchBar] Search initiated for: "${query.trim()}"`);
       onSearch(query.trim());
+      setShowSuggestions(false);
     } else {
       console.log('[SearchBar] Empty search query, not searching');
+      toast({
+        title: "Search query required",
+        description: "Please enter a search term.",
+        variant: "destructive",
+      });
     }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setQuery(suggestion);
+    setShowSuggestions(false);
+    onSearch(suggestion);
   };
 
   return (
@@ -30,26 +71,29 @@ const SearchBar = ({ onSearch, isLoading }: SearchBarProps) => {
       className="w-full max-w-2xl mx-auto mb-8"
     >
       <form onSubmit={handleSubmit} className="relative">
-        <div className="glass-panel overflow-hidden rounded-2xl shadow-sm transition-apple flex items-center">
+        <div className={`glass-panel overflow-hidden rounded-2xl shadow-sm transition-apple flex items-center ${
+          !locationGranted ? 'opacity-60' : ''
+        }`}>
           <Input
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search for grocery products (e.g., Milk, Bread, Rice)"
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            placeholder={locationGranted 
+              ? "Search for grocery products (e.g., Milk, Bread, Rice)" 
+              : "Allow location access first..."}
             className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 py-6 px-4 text-base"
-            disabled={isLoading}
+            disabled={isLoading || !locationGranted}
           />
           <div className="px-3">
             <Button 
               type="submit" 
               size="sm" 
               className="rounded-xl transition-apple h-10"
-              disabled={isLoading || !query.trim()}
-              onClick={() => {
-                if (!isLoading && query.trim()) {
-                  console.log(`[SearchBar] Search button clicked for: "${query.trim()}"`);
-                }
-              }}
+              disabled={isLoading || !query.trim() || !locationGranted}
             >
               {isLoading ? (
                 <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -66,7 +110,53 @@ const SearchBar = ({ onSearch, isLoading }: SearchBarProps) => {
             </Button>
           </div>
         </div>
+        
+        {/* Suggestions dropdown */}
+        {showSuggestions && suggestions.length > 0 && !isLoading && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute top-full left-0 right-0 mt-2 z-10 bg-background rounded-xl shadow-md overflow-hidden"
+          >
+            <ul className="py-2">
+              {suggestions.map((suggestion) => (
+                <li 
+                  key={suggestion}
+                  className="px-4 py-2 hover:bg-secondary cursor-pointer transition-colors"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                >
+                  {suggestion}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+        
+        {!locationGranted && (
+          <p className="text-sm text-muted-foreground mt-2 text-center animate-pulse">
+            ↑ Allow location access to compare prices in your area ↑
+          </p>
+        )}
       </form>
+      
+      {/* Popular searches */}
+      {!isLoading && locationGranted && (
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          {POPULAR_SEARCHES.slice(0, 5).map(item => (
+            <Button
+              key={item}
+              variant="secondary"
+              size="sm"
+              className="text-xs rounded-full"
+              onClick={() => handleSuggestionClick(item)}
+              disabled={isLoading}
+            >
+              {item}
+            </Button>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 };

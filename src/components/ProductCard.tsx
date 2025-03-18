@@ -15,6 +15,7 @@ export interface ProductData {
   imageUrl: string;
   prices: ProductPrices;
   unit?: string;
+  sources?: string[]; // Added sources array to track which platforms have this product
 }
 
 interface ProductCardProps {
@@ -42,8 +43,13 @@ const ProductCard = ({ product, index }: ProductCardProps) => {
 
   // Determine if this is a product with real prices (not just links)
   const hasRealPrices = Object.values(product.prices).some(
-    p => p && !p.price.includes('Click to view') && !p.price.includes('Live Price')
+    p => p && !p.price.includes('Click to view') && !p.price.includes('Live Price') && p.price !== 'Not available'
   );
+
+  // Count available platforms
+  const availablePlatformsCount = Object.values(product.prices).filter(
+    p => p && p.price !== 'Not available'
+  ).length;
 
   return (
     <motion.div
@@ -58,6 +64,32 @@ const ProductCard = ({ product, index }: ProductCardProps) => {
         <div className="relative aspect-square overflow-hidden bg-secondary/50">
           {!imageLoaded && !imageError && (
             <div className="absolute inset-0 shimmer"></div>
+          )}
+          
+          {/* Platform indicators */}
+          {product.sources && product.sources.length > 0 && (
+            <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
+              {product.sources.map(source => (
+                <div 
+                  key={source}
+                  className={`w-6 h-6 rounded-full ${
+                    source === 'zepto' ? 'bg-purple-100' : 
+                    source === 'blinkit' ? 'bg-yellow-100' : 
+                    'bg-orange-100'
+                  } flex items-center justify-center text-xs font-semibold`}
+                  title={`Available on ${source.charAt(0).toUpperCase() + source.slice(1)}`}
+                >
+                  {source.charAt(0).toUpperCase()}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Comparison badge for products available on multiple platforms */}
+          {availablePlatformsCount > 1 && (
+            <div className="absolute top-2 left-2 bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded z-10">
+              {availablePlatformsCount}-way comparison
+            </div>
           )}
           
           {!imageError ? (

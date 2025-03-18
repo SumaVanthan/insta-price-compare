@@ -1,11 +1,11 @@
 
 import { ProductData } from '@/components/ProductCard';
 import { ScrapedResult } from './types';
-import { stringSimilarity } from './stringComparison';
+import { areProductsSimilar } from './stringComparison';
 import { extractPrice } from './priceUtils';
 
 /**
- * Process and merge product data from multiple platforms based on similarity
+ * Process and merge product data from multiple platforms based on 80% similarity threshold
  */
 export function mergeProducts(
   zeptoProducts: ScrapedResult[], 
@@ -27,7 +27,6 @@ export function mergeProducts(
   
   const mergedProducts: ProductData[] = [];
   const processedProducts = new Set<string>();
-  const similarityThreshold = 0.8; // 80% name similarity as requested
   
   // Create a master list of all products
   const allProducts: Array<ScrapedResult & { source: string }> = [
@@ -54,7 +53,7 @@ export function mergeProducts(
     // Find all similar products across all platforms
     const similarProducts = allProducts.filter(p => 
       !isProductProcessed(p.name, processedProducts) && 
-      (p === product || stringSimilarity(p.name.toLowerCase(), product.name.toLowerCase()) >= similarityThreshold)
+      (p === product || areProductsSimilar(p.name, product.name))
     );
     
     console.log(`Found ${similarProducts.length} similar products for ${product.name}`);
@@ -65,7 +64,8 @@ export function mergeProducts(
       name: product.name, // Use the first product's name
       imageUrl: product.imageUrl || '/placeholder.svg',
       prices: {},
-      unit: product.unit // Use the first product's unit
+      unit: product.unit, // Use the first product's unit
+      sources: similarProducts.map(p => p.source as string)
     };
     
     // Add prices from each platform
@@ -130,7 +130,7 @@ function getPlatformBaseUrl(platform: string): string {
  */
 function isProductProcessed(productName: string, processedNames: Set<string>): boolean {
   for (const name of processedNames) {
-    if (stringSimilarity(productName.toLowerCase(), name.toLowerCase()) >= 0.8) { // Using 80% threshold
+    if (areProductsSimilar(productName, name)) {
       return true;
     }
   }
@@ -156,7 +156,8 @@ export function getFallbackProducts(query: string): ProductData[] {
           url: `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`
         }
       },
-      unit: 'Search result'
+      unit: 'Search result',
+      sources: ['zepto']
     },
     {
       id: '2',
@@ -169,7 +170,8 @@ export function getFallbackProducts(query: string): ProductData[] {
           url: `https://blinkit.com/s/?q=${encodeURIComponent(query)}`
         }
       },
-      unit: 'Search result'
+      unit: 'Search result',
+      sources: ['blinkit']
     },
     {
       id: '3',
@@ -182,7 +184,8 @@ export function getFallbackProducts(query: string): ProductData[] {
           url: `https://www.swiggy.com/instamart/search?custom_back=true&query=${encodeURIComponent(query)}`
         }
       },
-      unit: 'Search result'
+      unit: 'Search result',
+      sources: ['instamart']
     }
   ];
 }
