@@ -34,7 +34,7 @@ export class ProductScraper {
         '.items-container > div'
       ];
       
-      let productElements: cheerio.Element[] = [];
+      let productElements: any[] = [];
       
       // Try each selector until we find products
       for (const selector of productSelectors) {
