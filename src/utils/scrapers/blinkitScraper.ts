@@ -51,7 +51,7 @@ export class BlinkitScraper extends BaseScraper {
       
       if (productElements.length === 0) {
         console.log('[BlinkitScraper] No Blinkit products found, returning mock data');
-        return this.getMockBlinkitProducts(query);
+        return this.getFallbackProducts(query);
       }
       
       // Extract product information
@@ -127,14 +127,15 @@ export class BlinkitScraper extends BaseScraper {
       });
       
       console.log(`[BlinkitScraper] Successfully extracted ${products.length} Blinkit products`);
-      return products.length > 0 ? products : this.getMockBlinkitProducts(query);
+      return products.length > 0 ? products : this.getFallbackProducts(query);
     } catch (error) {
       this.logError('Blinkit', error);
-      return this.getMockBlinkitProducts(query);
+      return this.getFallbackProducts(query);
     }
   }
   
-  private getMockBlinkitProducts(query: string): ScrapedResult[] {
+  // Implement the abstract method getFallbackProducts
+  getFallbackProducts(query: string): ScrapedResult[] {
     console.log('[BlinkitScraper] Using mock Blinkit products');
     return [
       {

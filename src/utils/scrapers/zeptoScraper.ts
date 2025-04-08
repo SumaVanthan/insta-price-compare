@@ -53,7 +53,7 @@ export class ZeptoScraper extends BaseScraper {
       
       if (productElements.length === 0) {
         console.log('[ZeptoScraper] No Zepto products found, returning mock data');
-        return this.getMockZeptoProducts(query);
+        return this.getFallbackProducts(query);
       }
       
       // Extract product information
@@ -129,14 +129,15 @@ export class ZeptoScraper extends BaseScraper {
       });
       
       console.log(`[ZeptoScraper] Successfully extracted ${products.length} Zepto products`);
-      return products.length > 0 ? products : this.getMockZeptoProducts(query);
+      return products.length > 0 ? products : this.getFallbackProducts(query);
     } catch (error) {
       this.logError('Zepto', error);
-      return this.getMockZeptoProducts(query);
+      return this.getFallbackProducts(query);
     }
   }
   
-  private getMockZeptoProducts(query: string): ScrapedResult[] {
+  // Implement the abstract method getFallbackProducts
+  getFallbackProducts(query: string): ScrapedResult[] {
     console.log('[ZeptoScraper] Using mock Zepto products');
     return [
       {
