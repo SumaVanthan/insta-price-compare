@@ -18,9 +18,15 @@ export class ScraperClient {
   
   private cache: Map<string, {data: any, timestamp: number}> = new Map();
   private cacheTTL: number = 5 * 60 * 1000; // 5 minutes
+  private proxyFailureCount: Map<string, number> = new Map(); // Track proxy reliability
   
   constructor(private timeout: number = 5000) {
     console.log(`[ScraperClient] Initialized with timeout: ${timeout}ms`);
+    
+    // Initialize proxy failure counts
+    this.proxyUrls.forEach(proxy => {
+      this.proxyFailureCount.set(proxy, 0);
+    });
   }
   
   async fetch(url: string): Promise<ScraperResult> {
@@ -39,14 +45,25 @@ export class ScraperClient {
     
     console.log(`[ScraperClient] Fetching ${url} with timeout ${this.timeout}ms`);
     
-    // Try each proxy in parallel
-    const proxyPromises = this.proxyUrls.map(proxyUrl => {
-      console.log(`[ScraperClient] Trying proxy: ${proxyUrl.split('/')[2]} for ${url}`);
-      return this.fetchWithProxy(proxyUrl, url);
+    // Sort proxies by failure count (most reliable first)
+    const sortedProxies = [...this.proxyUrls].sort((a, b) => {
+      return (this.proxyFailureCount.get(a) || 0) - (this.proxyFailureCount.get(b) || 0);
+    });
+    
+    // Try each proxy in parallel with the most reliable ones prioritized
+    const proxyPromises = sortedProxies.map(proxyUrl => {
+      const proxyName = proxyUrl.split('/')[2];
+      console.log(`[ScraperClient] Trying proxy: ${proxyName} for ${url}`);
+      return this.fetchWithProxy(proxyUrl, url).catch(error => {
+        // Increment failure count for this proxy
+        const currentCount = this.proxyFailureCount.get(proxyUrl) || 0;
+        this.proxyFailureCount.set(proxyUrl, currentCount + 1);
+        throw error; // Re-throw to be caught by Promise.race
+      });
     });
     
     try {
-      // Race all proxy requests
+      // Race all proxy requests with overall timeout
       const response = await Promise.race([
         ...proxyPromises,
         new Promise<Response>((_, reject) => 
@@ -60,23 +77,22 @@ export class ScraperClient {
       
       const html = await response.text();
       
-      if (html.length < 1000 || (!html.includes('<html') && !html.includes('<body'))) {
-        console.error(`[ScraperClient] Invalid HTML response (length: ${html.length})`);
-        console.log(`[ScraperClient] HTML preview: ${html.substring(0, 200)}...`);
+      // Validate HTML response
+      if (this.isValidHtml(html)) {
+        // Save to cache
+        this.saveToCache(url, html);
+        
+        const duration = Date.now() - startTime;
+        console.log(`[ScraperClient] Successfully fetched ${url} in ${duration}ms`);
+        
+        return {
+          success: true,
+          data: html,
+          duration
+        };
+      } else {
         throw new Error('Invalid HTML response');
       }
-      
-      // Save to cache
-      this.saveToCache(url, html);
-      
-      const duration = Date.now() - startTime;
-      console.log(`[ScraperClient] Successfully fetched ${url} in ${duration}ms`);
-      
-      return {
-        success: true,
-        data: html,
-        duration
-      };
     } catch (error) {
       console.error(`[ScraperClient] Error fetching ${url}:`, error);
       return {
@@ -85,6 +101,33 @@ export class ScraperClient {
         duration: Date.now() - startTime
       };
     }
+  }
+  
+  /**
+   * Check if HTML response is valid and contains actual content
+   */
+  private isValidHtml(html: string): boolean {
+    if (!html || html.length < 1000) {
+      console.warn(`[ScraperClient] Very short HTML response (${html?.length || 0} chars)`);
+      return false;
+    }
+    
+    if (!html.includes('<html') && !html.includes('<body')) {
+      console.warn('[ScraperClient] Response does not contain HTML tags');
+      return false;
+    }
+    
+    // Check for common error messages
+    const lowerHtml = html.toLowerCase();
+    if (lowerHtml.includes('access denied') || 
+        lowerHtml.includes('forbidden') || 
+        lowerHtml.includes('captcha') || 
+        lowerHtml.includes('too many requests')) {
+      console.warn('[ScraperClient] Response contains access restriction indicators');
+      return false;
+    }
+    
+    return true;
   }
   
   async parse(html: string, selectors: Record<string, string>): Promise<any> {
@@ -105,8 +148,11 @@ export class ScraperClient {
     try {
       return fetch(proxyUrl, {
         headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
           'X-Requested-With': 'XMLHttpRequest',
-          'Origin': window.location.origin
+          'Origin': window.location.origin,
+          'Accept': 'text/html,application/xhtml+xml,application/xml',
+          'Accept-Language': 'en-US,en;q=0.9'
         },
         signal: AbortSignal.timeout(this.timeout)
       });
@@ -135,5 +181,15 @@ export class ScraperClient {
   clearCache(): void {
     console.log(`[ScraperClient] Cache cleared (had ${this.cache.size} entries)`);
     this.cache.clear();
+  }
+  
+  /**
+   * Reset proxy failure counts to give all proxies a fresh chance
+   */
+  resetProxyStats(): void {
+    this.proxyUrls.forEach(proxy => {
+      this.proxyFailureCount.set(proxy, 0);
+    });
+    console.log('[ScraperClient] Proxy statistics reset');
   }
 }
