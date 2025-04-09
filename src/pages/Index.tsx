@@ -9,7 +9,7 @@ import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
 import { searchProducts } from '@/utils/api';
 import { ProductData } from '@/components/ProductCard';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -20,6 +20,13 @@ const Index = () => {
   const [searchStartTime, setSearchStartTime] = useState(Date.now());
   const [currentQuery, setCurrentQuery] = useState<string>('');
   const { toast } = useToast();
+
+  // Add state for search metadata
+  const [searchMetadata, setSearchMetadata] = useState({
+    zepto: '',
+    blinkit: '',
+    instamart: ''
+  });
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -81,6 +88,17 @@ const Index = () => {
       if (isLoading) { // Make sure we're still in loading state (not cancelled)
         setProducts(result.products);
         console.log(`Search completed with ${result.products.length} products`);
+        
+        // Extract search metadata from products if available
+        const zeptoInfo = result.products.find(p => p.source === 'zepto' && p.searchInfo)?.searchInfo || '';
+        const blinkitInfo = result.products.find(p => p.source === 'blinkit' && p.searchInfo)?.searchInfo || '';
+        const instamartInfo = result.products.find(p => p.source === 'instamart' && p.searchInfo)?.searchInfo || '';
+        
+        setSearchMetadata({
+          zepto: zeptoInfo || `Searched for "${query}" on Zepto`,
+          blinkit: blinkitInfo || `Searched for "${query}" on Blinkit`,
+          instamart: instamartInfo || `Searched for "${query}" on Instamart`
+        });
         
         if (result.products.length === 0) {
           toast({
@@ -157,7 +175,55 @@ const Index = () => {
         
         <LocationPermission onLocationGranted={handleLocationGranted} />
         
-        <SearchBar onSearch={handleSearch} isLoading={isLoading} locationGranted={!!location} />
+        <SearchBar 
+          onSearch={handleSearch} 
+          isLoading={isLoading} 
+          locationGranted={!!location}
+          currentQuery={currentQuery} 
+        />
+        
+        {/* Show search metadata if available and products found */}
+        {hasSearched && !isLoading && !error && products.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-background/50 backdrop-blur-sm p-4 rounded-xl shadow-sm max-w-3xl mx-auto"
+          >
+            <h3 className="text-lg font-medium mb-2 text-center">Search Information</h3>
+            <div className="grid gap-2 text-sm">
+              {searchMetadata.zepto && (
+                <div className="flex items-center gap-2 p-2 bg-[#792FD6]/10 rounded-lg">
+                  <img 
+                    src="https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png" 
+                    alt="Zepto" 
+                    className="w-5 h-5 object-contain" 
+                  />
+                  <span>{searchMetadata.zepto}</span>
+                </div>
+              )}
+              {searchMetadata.blinkit && (
+                <div className="flex items-center gap-2 p-2 bg-[#F3CF00]/10 rounded-lg">
+                  <img 
+                    src="https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png" 
+                    alt="Blinkit" 
+                    className="w-5 h-5 object-contain" 
+                  />
+                  <span>{searchMetadata.blinkit}</span>
+                </div>
+              )}
+              {searchMetadata.instamart && (
+                <div className="flex items-center gap-2 p-2 bg-[#FC8019]/10 rounded-lg">
+                  <img 
+                    src="https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg" 
+                    alt="Instamart" 
+                    className="w-5 h-5 object-contain" 
+                  />
+                  <span>{searchMetadata.instamart}</span>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
         
         <AnimatePresence mode="wait">
           {isLoading ? (

@@ -22,6 +22,44 @@ export class ZeptoScraper extends BaseScraper {
       const $ = result.data;
       console.log(`[ZeptoScraper] Successfully fetched Zepto HTML`);
       
+      // Get search info - try to find the search info on the page
+      let searchInfo = '';
+      try {
+        // Different selectors that might contain search information
+        const searchInfoSelectors = [
+          '.search-info', 
+          '.search-term', 
+          '[class*="SearchInfo"]',
+          '.search-results-header'
+        ];
+        
+        for (const selector of searchInfoSelectors) {
+          const text = $(selector).first().text().trim();
+          if (text) {
+            searchInfo = text;
+            break;
+          }
+        }
+        
+        // If no specific selector found, try to extract from page title
+        if (!searchInfo) {
+          const title = $('title').text().trim();
+          if (title.includes(query)) {
+            searchInfo = `Search for "${query}" on Zepto`;
+          }
+        }
+        
+        // Fallback
+        if (!searchInfo) {
+          searchInfo = `Showing results for "${query}" on Zepto`;
+        }
+        
+        console.log(`[ZeptoScraper] Search info: ${searchInfo}`);
+      } catch (err) {
+        console.error('[ZeptoScraper] Error extracting search info:', err);
+        searchInfo = `Searched for "${query}" on Zepto`;
+      }
+      
       // Selectors for product elements
       const productSelectors = [
         'div[data-testid="product-card"]', 
@@ -126,7 +164,9 @@ export class ZeptoScraper extends BaseScraper {
               unit: unit || '',
               url: url || `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`,
               imageUrl: imageUrl || '',
-              source: 'zepto'
+              source: 'zepto',
+              searchQuery: query, // Add the search query
+              searchInfo: searchInfo // Add search info from the page
             });
           }
         } catch (err) {
@@ -144,6 +184,8 @@ export class ZeptoScraper extends BaseScraper {
   
   // Implement the abstract method getFallbackProducts
   getFallbackProducts(query: string): ScrapedResult[] {
+    // We don't want to show mock data to users anymore
+    console.log('[ZeptoScraper] Fallback requested but returning empty array as mock data is disabled');
     return [];
   }
 }

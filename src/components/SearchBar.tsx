@@ -3,21 +3,29 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
   isLoading: boolean;
   locationGranted: boolean;
+  currentQuery?: string; // Add current query prop
 }
 
 const POPULAR_SEARCHES = ['Milk', 'Rice', 'Bread', 'Eggs', 'Onion', 'Potato'];
 
-const SearchBar = ({ onSearch, isLoading, locationGranted }: SearchBarProps) => {
+const SearchBar = ({ onSearch, isLoading, locationGranted, currentQuery = '' }: SearchBarProps) => {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast } = useToast();
+
+  // Update query when currentQuery changes (for remembering search)
+  useEffect(() => {
+    if (currentQuery && currentQuery.trim() !== '') {
+      setQuery(currentQuery);
+    }
+  }, [currentQuery]);
 
   // Filter suggestions based on current query
   useEffect(() => {
@@ -139,6 +147,13 @@ const SearchBar = ({ onSearch, isLoading, locationGranted }: SearchBarProps) => 
           </p>
         )}
       </form>
+      
+      {/* Display current search if available */}
+      {currentQuery && (
+        <div className="mt-2 text-center text-sm text-muted-foreground">
+          Currently showing results for: <span className="font-medium">{currentQuery}</span>
+        </div>
+      )}
       
       {/* Popular searches */}
       {!isLoading && locationGranted && (

@@ -1,11 +1,12 @@
-
 export interface ScrapedResult {
   name: string;
   price: string;
   unit: string;
   url: string;
   imageUrl: string;
-  source?: string;
+  source: string;
+  searchQuery?: string;
+  searchInfo?: string;
 }
 
 export interface SearchResultResponse {
