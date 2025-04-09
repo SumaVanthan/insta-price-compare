@@ -1,3 +1,4 @@
+
 export interface ScrapedResult {
   name: string;
   price: string;

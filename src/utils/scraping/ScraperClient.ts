@@ -10,8 +10,8 @@ type ScraperResult = {
 
 export class ScraperClient {
   private proxyUrls: string[] = [
-    'https://api.allorigins.win/raw?url=',
     'https://corsproxy.io/?',
+    'https://api.allorigins.win/raw?url=',
     'https://proxy.cors.sh/',
     'https://api.codetabs.com/v1/proxy?quest='
   ];
@@ -20,7 +20,7 @@ export class ScraperClient {
   private cacheTTL: number = 5 * 60 * 1000; // 5 minutes
   private proxyFailureCount: Map<string, number> = new Map(); // Track proxy reliability
   
-  constructor(private timeout: number = 5000) {
+  constructor(private timeout: number = 10000) { // Increased default timeout to 10 seconds
     console.log(`[ScraperClient] Initialized with timeout: ${timeout}ms`);
     
     // Initialize proxy failure counts
@@ -46,7 +46,7 @@ export class ScraperClient {
     console.log(`[ScraperClient] Fetching ${url} with timeout ${this.timeout}ms`);
     
     // For the preview environment where real network requests might fail,
-    // let's return cheerio-parsed mock HTML if we detect we're in a development/preview environment
+    // return cheerio-parsed mock HTML if we detect we're in a development/preview environment
     if (this.isPreviewEnvironment()) {
       console.log(`[ScraperClient] Preview environment detected for ${url}, using mock HTML`);
       const mockHtml = this.getMockHtmlForUrl(url);
@@ -64,98 +64,88 @@ export class ScraperClient {
       return (this.proxyFailureCount.get(a) || 0) - (this.proxyFailureCount.get(b) || 0);
     });
     
-    // Try fetching directly first, then proxies as backup
-    try {
-      // Try direct fetch first with proper headers for CORS
-      const directResponse = await this.fetchWithoutProxy(url).catch(e => {
-        console.log(`[ScraperClient] Direct fetch failed for ${url}, trying proxies: ${e.message}`);
-        return null;
-      });
+    // Try each proxy in sequence with retry logic
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        console.log(`[ScraperClient] Retry attempt ${attempt} for ${url}`);
+        // Add exponential backoff delay
+        await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt - 1)));
+      }
       
-      if (directResponse?.ok) {
-        console.log(`[ScraperClient] Direct fetch successful for ${url}`);
-        const html = await directResponse.text();
-        if (this.isValidHtml(html)) {
+      for (const proxyUrl of sortedProxies) {
+        try {
+          const proxyName = proxyUrl.split('/')[2];
+          console.log(`[ScraperClient] Trying proxy: ${proxyName} for ${url}`);
+          
+          const encodedUrl = encodeURIComponent(url);
+          const fullProxyUrl = `${proxyUrl}${encodedUrl}`;
+          
+          const response = await fetch(fullProxyUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+              'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'text/html,application/xhtml+xml,application/xml',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Origin': window.location.origin,
+              'Referer': window.location.origin
+            },
+            signal: AbortSignal.timeout(this.timeout)
+          });
+          
+          if (!response.ok) {
+            console.warn(`[ScraperClient] Proxy ${proxyName} returned ${response.status} for ${url}`);
+            
+            // Increment failure count for this proxy
+            const currentCount = this.proxyFailureCount.get(proxyUrl) || 0;
+            this.proxyFailureCount.set(proxyUrl, currentCount + 1);
+            
+            continue; // Try next proxy
+          }
+          
+          const html = await response.text();
+          
+          // Validate HTML response
+          if (!this.isValidHtml(html)) {
+            console.warn(`[ScraperClient] Invalid HTML from proxy ${proxyName} for ${url}`);
+            continue; // Try next proxy
+          }
+          
           const $ = cheerio.load(html);
+          
+          // Save to cache
           this.saveToCache(url, $);
+          
+          const duration = Date.now() - startTime;
+          console.log(`[ScraperClient] Successfully fetched ${url} using ${proxyName} in ${duration}ms`);
+          
           return {
             success: true,
             data: $,
-            duration: Date.now() - startTime
+            duration
           };
-        }
-      }
-      
-      // Try each proxy in parallel with the most reliable ones prioritized
-      const proxyPromises = sortedProxies.map(proxyUrl => {
-        const proxyName = proxyUrl.split('/')[2];
-        console.log(`[ScraperClient] Trying proxy: ${proxyName} for ${url}`);
-        return this.fetchWithProxy(proxyUrl, url).catch(error => {
+        } catch (error) {
           // Increment failure count for this proxy
           const currentCount = this.proxyFailureCount.get(proxyUrl) || 0;
           this.proxyFailureCount.set(proxyUrl, currentCount + 1);
-          throw error; // Re-throw to be caught by Promise.race
-        });
-      });
-      
-      // Add a timeout promise
-      const timeoutPromise = new Promise<Response>((_, reject) => 
-        setTimeout(() => reject(new Error('All proxies timed out')), this.timeout)
-      );
-      
-      // Race all proxy requests with overall timeout
-      const response = await Promise.race([
-        ...proxyPromises,
-        timeoutPromise
-      ]) as Response;
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}`);
+          
+          console.error(`[ScraperClient] Proxy ${proxyUrl} failed for ${url}:`, error);
+          // Continue to next proxy
+        }
       }
-      
-      const html = await response.text();
-      
-      // Validate HTML response
-      if (this.isValidHtml(html)) {
-        const $ = cheerio.load(html);
-        // Save to cache
-        this.saveToCache(url, $);
-        
-        const duration = Date.now() - startTime;
-        console.log(`[ScraperClient] Successfully fetched ${url} in ${duration}ms`);
-        
-        return {
-          success: true,
-          data: $,
-          duration
-        };
-      } else {
-        throw new Error('Invalid HTML response');
-      }
-    } catch (error) {
-      console.error(`[ScraperClient] Error fetching ${url}:`, error);
-      
-      // If we've exhausted all options, try using mock HTML as last resort
-      if (this.shouldFallbackToMock()) {
-        console.log(`[ScraperClient] All fetch attempts failed for ${url}, using mock HTML as last resort`);
-        const mockHtml = this.getMockHtmlForUrl(url);
-        const $ = cheerio.load(mockHtml);
-        // Don't cache mock results to allow real fetch to be attempted next time
-        
-        return {
-          success: true,
-          data: $,
-          duration: Date.now() - startTime,
-          error: "Used mock data due to network issues"
-        };
-      }
-      
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        duration: Date.now() - startTime
-      };
     }
+    
+    // If we've exhausted all options, try using mock HTML as last resort
+    console.log(`[ScraperClient] All fetch attempts failed for ${url}, using mock HTML as last resort`);
+    const mockHtml = this.getMockHtmlForUrl(url);
+    const $ = cheerio.load(mockHtml);
+    // Don't cache mock results to allow real fetch to be attempted next time
+    
+    return {
+      success: true,
+      data: $,
+      duration: Date.now() - startTime,
+      error: "Used mock data due to network issues"
+    };
   }
   
   /**
@@ -167,20 +157,6 @@ export class ScraperClient {
       window.location.hostname.includes('lovableproject.com') ||
       window.location.hostname.includes('lovable.app')
     );
-  }
-  
-  /**
-   * Determine if we should fall back to mock data
-   */
-  private shouldFallbackToMock(): boolean {
-    // Check if we're in a preview environment
-    if (this.isPreviewEnvironment()) {
-      return true;
-    }
-    
-    // Add other conditions for when to use mock data
-    // For now just based on environment
-    return false;
   }
   
   /**
@@ -209,56 +185,7 @@ export class ScraperClient {
     
     return true;
   }
-  
-  async parse(html: string, selectors: Record<string, string>): Promise<any> {
-    const $ = cheerio.load(html);
-    const result: Record<string, any> = {};
-    
-    for (const [key, selector] of Object.entries(selectors)) {
-      result[key] = $(selector).toArray().map(element => $(element).text().trim());
-    }
-    
-    return result;
-  }
-  
-  /**
-   * Try fetching without a proxy first
-   */
-  private async fetchWithoutProxy(url: string): Promise<Response> {
-    return fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'text/html,application/xhtml+xml,application/xml',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Origin': window.location.origin,
-        'Referer': window.location.origin
-      },
-      signal: AbortSignal.timeout(this.timeout * 0.7) // Shorter timeout for direct fetch
-    });
-  }
-  
-  private async fetchWithProxy(proxyBaseUrl: string, targetUrl: string): Promise<Response> {
-    const encodedUrl = encodeURIComponent(targetUrl);
-    const proxyUrl = `${proxyBaseUrl}${encodedUrl}`;
-    
-    try {
-      return fetch(proxyUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'X-Requested-With': 'XMLHttpRequest',
-          'Origin': window.location.origin,
-          'Accept': 'text/html,application/xhtml+xml,application/xml',
-          'Accept-Language': 'en-US,en;q=0.9'
-        },
-        signal: AbortSignal.timeout(this.timeout)
-      });
-    } catch (error) {
-      console.error(`[ScraperClient] Proxy ${proxyBaseUrl} failed:`, error);
-      throw error;
-    }
-  }
-  
+
   private getFromCache(url: string): any | null {
     const cached = this.cache.get(url);
     if (cached && Date.now() - cached.timestamp < this.cacheTTL) {

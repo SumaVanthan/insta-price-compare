@@ -9,10 +9,10 @@ interface SearchBarProps {
   onSearch: (query: string) => void;
   isLoading: boolean;
   locationGranted: boolean;
-  currentQuery?: string; // Add current query prop
+  currentQuery?: string;
 }
 
-const POPULAR_SEARCHES = ['Milk', 'Rice', 'Bread', 'Eggs', 'Onion', 'Potato'];
+const POPULAR_SEARCHES = ['Milk', 'Rice', 'Bread', 'Eggs', 'Onion', 'Potato', 'Apple', 'Tomato'];
 
 const SearchBar = ({ onSearch, isLoading, locationGranted, currentQuery = '' }: SearchBarProps) => {
   const [query, setQuery] = useState('');
@@ -100,21 +100,26 @@ const SearchBar = ({ onSearch, isLoading, locationGranted, currentQuery = '' }: 
             <Button 
               type="submit" 
               size="sm" 
-              className="rounded-xl transition-apple h-10"
+              className={`rounded-xl transition-apple h-10 ${isLoading ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
               disabled={isLoading || !query.trim() || !locationGranted}
             >
               {isLoading ? (
-                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+                <>
+                  <svg className="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>{isLoading ? 'Searching...' : 'Search'}</span>
+                </>
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <span className="ml-2">Search</span>
+                </>
               )}
-              <span className="ml-2">Search</span>
             </Button>
           </div>
         </div>
@@ -158,7 +163,7 @@ const SearchBar = ({ onSearch, isLoading, locationGranted, currentQuery = '' }: 
       {/* Popular searches */}
       {!isLoading && locationGranted && (
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          {POPULAR_SEARCHES.slice(0, 5).map(item => (
+          {POPULAR_SEARCHES.slice(0, 6).map(item => (
             <Button
               key={item}
               variant="secondary"
@@ -170,6 +175,12 @@ const SearchBar = ({ onSearch, isLoading, locationGranted, currentQuery = '' }: 
               {item}
             </Button>
           ))}
+        </div>
+      )}
+      
+      {isLoading && (
+        <div className="mt-4 text-center text-sm text-amber-600 animate-pulse">
+          Searching across multiple platforms... this may take a moment
         </div>
       )}
     </motion.div>
