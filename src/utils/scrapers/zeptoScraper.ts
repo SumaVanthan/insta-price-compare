@@ -13,6 +13,12 @@ export class ZeptoScraper extends BaseScraper {
         throw new Error(`Failed to fetch Zepto data: ${result.error}`);
       }
       
+      // Check if we got mock data due to network issues
+      if (result.error && result.error.includes('mock data')) {
+        console.log(`[ZeptoScraper] Received mock data due to network issues`);
+        throw new Error('Network error: Unable to fetch real data');
+      }
+      
       const $ = result.data;
       console.log(`[ZeptoScraper] Successfully fetched Zepto HTML`);
       
@@ -52,8 +58,8 @@ export class ZeptoScraper extends BaseScraper {
       }
       
       if (productElements.length === 0) {
-        console.log('[ZeptoScraper] No Zepto products found, returning mock data');
-        return this.getFallbackProducts(query);
+        console.log('[ZeptoScraper] No Zepto products found');
+        return [];
       }
       
       // Extract product information
@@ -113,13 +119,13 @@ export class ZeptoScraper extends BaseScraper {
             imageUrl = img.attr('src') || img.attr('data-src') || '';
           }
           
-          if (name || price) {
+          if (name && price) {
             products.push({
-              name: name || `Zepto Product ${index + 1}`,
-              price: price || 'Price not available',
+              name: name,
+              price: price,
               unit: unit || '',
               url: url || `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`,
-              imageUrl: imageUrl || 'https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png',
+              imageUrl: imageUrl || '',
               source: 'zepto'
             });
           }
@@ -129,41 +135,15 @@ export class ZeptoScraper extends BaseScraper {
       });
       
       console.log(`[ZeptoScraper] Successfully extracted ${products.length} Zepto products`);
-      return products.length > 0 ? products : this.getFallbackProducts(query);
+      return products;
     } catch (error) {
       this.logError('Zepto', error);
-      return this.getFallbackProducts(query);
+      return [];
     }
   }
   
   // Implement the abstract method getFallbackProducts
   getFallbackProducts(query: string): ScrapedResult[] {
-    console.log('[ZeptoScraper] Using mock Zepto products');
-    return [
-      {
-        name: "Daawat Basmati Rice - Super",
-        price: "₹159",
-        unit: "1 kg",
-        url: `https://www.zeptonow.com/product/daawat-basmati-rice-super`,
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png",
-        source: "zepto"
-      },
-      {
-        name: "India Gate Basmati Rice - Classic",
-        price: "₹232",
-        unit: "1 kg",
-        url: `https://www.zeptonow.com/product/india-gate-basmati-rice-classic`,
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png",
-        source: "zepto"
-      },
-      {
-        name: "Fortune Everyday Basmati Rice",
-        price: "₹120",
-        unit: "1 kg",
-        url: `https://www.zeptonow.com/product/fortune-everyday-basmati-rice`,
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png",
-        source: "zepto"
-      }
-    ];
+    return [];
   }
 }
