@@ -1,11 +1,10 @@
-
 import { stringSimilarity } from './string_similarity';
 
 /**
  * Calculate the similarity between two product names, making adjustments for common
  * variations in how products might be listed
  */
-export function areProductsSimilar(name1: string, name2: string): boolean {
+export function areProductsSimilar(name1: string, name2: string, threshold = 0.6): boolean {
   // Simple pre-processing to normalize strings
   const normalizedName1 = normalizeProductName(name1);
   const normalizedName2 = normalizeProductName(name2);
@@ -16,9 +15,8 @@ export function areProductsSimilar(name1: string, name2: string): boolean {
   // Debug log for monitoring matches
   console.log(`Comparing "${name1}" with "${name2}": ${similarityScore * 100}% similarity`);
   
-  // Products are similar if similarity score is >= 60%
-  // Lowered from 80% to catch more matches
-  return similarityScore >= 0.6;
+  // Products are similar if similarity score is >= threshold (default 60%)
+  return similarityScore >= threshold;
 }
 
 /**

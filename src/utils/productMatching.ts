@@ -1,3 +1,4 @@
+
 import { ProductData } from '@/components/ProductCard';
 import { ScrapedResult } from './types';
 import { areProductsSimilar } from './stringComparison';
@@ -114,7 +115,7 @@ export function mergeProducts(
     // Find all similar products across all platforms
     const similarProducts = allProducts.filter(p => 
       !processedProducts.has(p.name) && 
-      (p === product || areProductsSimilar(p.name, product.name, similarityThreshold))
+      (p === product || areProductsSimilar(p.name, product.name))
     );
     
     console.log(`Found ${similarProducts.length} similar products for ${product.name}`);
