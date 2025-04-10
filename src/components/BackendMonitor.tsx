@@ -4,6 +4,8 @@ import { toast } from '@/hooks/use-toast';
 import { scraperService } from '@/utils/scraping/ScraperService';
 import { Button } from '@/components/ui/button';
 import { getAllPlatforms } from '@/utils/types';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 // BackendMonitor component to debug and configure the backend behavior
 const BackendMonitor = () => {
@@ -18,13 +20,18 @@ const BackendMonitor = () => {
   }, [useMockData]);
 
   const toggleMockData = () => {
-    setUseMockData(prev => !prev);
+    const newValue = !useMockData;
+    setUseMockData(newValue);
+    
     toast({
-      title: `${!useMockData ? "Using mock data" : "Using real data"}`,
-      description: `${!useMockData 
+      title: `${newValue ? "Using mock data" : "Using real data"}`,
+      description: `${newValue 
         ? "Search will use mock data instead of real scraping" 
         : "Search will attempt to scrape real data from platforms"}`,
     });
+    
+    // Clear cache after changing mode to ensure fresh results
+    scraperService.clearCache();
   };
 
   const clearCache = () => {
@@ -35,11 +42,12 @@ const BackendMonitor = () => {
   if (!isOpen) {
     return (
       <div 
-        className="fixed bottom-4 right-4 bg-background border border-border rounded-lg shadow-lg z-50 cursor-pointer"
+        className={`fixed bottom-4 right-4 bg-background border ${useMockData ? 'border-amber-500' : 'border-border'} rounded-lg shadow-lg z-50 cursor-pointer`}
         onClick={() => setIsOpen(true)}
       >
-        <div className="p-2 text-sm font-medium">
-          Backend Monitor
+        <div className="p-2 text-sm font-medium flex items-center gap-2">
+          <div className={`h-3 w-3 rounded-full ${useMockData ? "bg-amber-500" : "bg-green-500"}`}></div>
+          Backend Monitor {useMockData && "(Mock Mode)"}
         </div>
       </div>
     );
@@ -57,23 +65,28 @@ const BackendMonitor = () => {
       
       <div className="p-3 space-y-4">
         {/* Data source control */}
-        <div className="space-y-2">
+        <div className={`space-y-2 p-3 rounded-md ${useMockData ? 'bg-amber-100/50' : 'bg-green-100/50'}`}>
           <h4 className="text-sm font-medium">Data Source</h4>
           <div className="flex items-center space-x-2">
-            <Button 
-              size="sm"
-              variant={useMockData ? "outline" : "default"}
-              onClick={toggleMockData}
-            >
-              {useMockData ? "Switch to Real Data" : "Switch to Mock Data"}
-            </Button>
-            <div className={`h-3 w-3 rounded-full ${useMockData ? "bg-amber-500" : "bg-green-500"}`}></div>
+            <Switch 
+              id="mock-mode" 
+              checked={useMockData}
+              onCheckedChange={toggleMockData}
+            />
+            <Label htmlFor="mock-mode">
+              {useMockData ? "Using Mock Data" : "Using Real Data"}
+            </Label>
           </div>
           <p className="text-xs text-muted-foreground">
             {useMockData 
-              ? "Currently using mock data (faster but not real)" 
+              ? "Currently using mock data (faster but not real results)" 
               : "Currently attempting to fetch real data (may be slower)"}
           </p>
+          {useMockData && (
+            <div className="mt-2 bg-amber-200/50 p-2 rounded text-xs">
+              <strong>Note:</strong> Mock mode is enabled. Products shown are sample data not real results. Switch this off to attempt real scraping.
+            </div>
+          )}
         </div>
 
         {/* Cache control */}
@@ -82,6 +95,9 @@ const BackendMonitor = () => {
           <Button size="sm" variant="outline" onClick={clearCache}>
             Clear Cache
           </Button>
+          <p className="text-xs text-muted-foreground">
+            Clear cache to force new data to be fetched on next search
+          </p>
         </div>
         
         {/* Platform status */}
@@ -106,7 +122,9 @@ const BackendMonitor = () => {
       </div>
       
       <div className="p-2 border-t border-border text-xs text-muted-foreground">
-        This panel is for development use only.
+        {useMockData 
+          ? "Switch to real data for actual product prices"
+          : "Switch to mock data if real data isn't working"}
       </div>
     </div>
   );

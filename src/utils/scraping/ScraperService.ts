@@ -1,4 +1,3 @@
-
 import { ProductScraper } from './ProductScraper';
 import { ScrapedResult } from '../types';
 import { mergeProducts, getFallbackProducts } from '../productMatching';
@@ -20,6 +19,9 @@ class ScraperService {
   async searchProducts(query: string, location: { latitude: number; longitude: number }) {
     console.log(`[ScraperService] Searching for "${query}" at location: ${location.latitude}, ${location.longitude}`);
     
+    // Check if mock data is requested
+    const useMockData = localStorage.getItem('use_mock_data') === 'true';
+    
     // Check cache first (cache by query and location)
     const cacheKey = `search:${query}:${location.latitude}:${location.longitude}`;
     const cached = this.getCachedResult(cacheKey);
@@ -30,6 +32,12 @@ class ScraperService {
     
     try {
       console.log('[ScraperService] Starting parallel scraping of all sources...');
+      
+      // If mock data is explicitly requested, use it directly
+      if (useMockData) {
+        console.log('[ScraperService] Mock data requested, using mock products');
+        return this.getMockResults(query);
+      }
       
       // Set up a global timeout for the entire search operation
       const timeoutPromise = new Promise((_, reject) => {
@@ -67,29 +75,21 @@ class ScraperService {
         anyRealProducts
       });
       
-      // If no real products found from any source, show appropriate message
+      // If no real products found from any source, show appropriate message and use mock data
       if (!anyRealProducts) {
         // Rate limit network error messages (only show once every 30 seconds)
         const now = Date.now();
         if (now - this.lastNetworkErrorTime > 30000) {
           this.lastNetworkErrorTime = now;
           toast({
-            title: "Using cached results",
-            description: "Could not fetch real-time data. Showing available cached results.",
+            title: "Using mock results",
+            description: "Could not fetch real-time data. Showing mock results instead.",
             duration: 5000,
           });
         }
         
-        // Use cached results if available, otherwise return fallback products
-        const cachedResults = this.getAllCachedResults(query);
-        if (cachedResults.length > 0) {
-          console.log(`[ScraperService] Using ${cachedResults.length} cached products due to network issues`);
-          return { products: cachedResults };
-        }
-        
-        // Use fallback products since we have no real or cached data
-        const fallbackProducts = getFallbackProducts(query);
-        return { products: fallbackProducts };
+        // If real products failed, use mock data as fallback
+        return this.getMockResults(query);
       }
       
       // Merge products and cache the result
@@ -113,14 +113,40 @@ class ScraperService {
       // Show error toast to user
       toast({
         title: "Search Issues",
-        description: "Could not fetch all results. Showing what we found.",
+        description: "Could not fetch results. Showing mock data instead.",
         variant: "destructive",
       });
       
-      // Return fallback results
-      const fallbackProducts = getFallbackProducts(query);
-      return { products: fallbackProducts };
+      // Return mock results as fallback
+      return this.getMockResults(query);
     }
+  }
+  
+  /**
+   * Get mock results for all platforms
+   */
+  private getMockResults(query: string) {
+    console.log('[ScraperService] Using mock results for all platforms');
+    
+    // Get mock data from all platforms
+    const zeptoProducts = this.scraper.getMockZeptoProducts(query);
+    const blinkitProducts = this.scraper.getMockBlinkitProducts(query);
+    const instamartProducts = this.scraper.getMockInstamartProducts(query);
+    
+    // Mark all products as mock data
+    zeptoProducts.forEach(p => p.isMock = true);
+    blinkitProducts.forEach(p => p.isMock = true);
+    instamartProducts.forEach(p => p.isMock = true);
+    
+    // Merge mock products
+    const mergedProducts = mergeProducts(
+      zeptoProducts,
+      blinkitProducts,
+      instamartProducts,
+      query
+    );
+    
+    return { products: mergedProducts };
   }
   
   /**

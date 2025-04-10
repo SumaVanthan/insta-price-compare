@@ -13,6 +13,7 @@ export interface ScrapedResult {
 
 export interface SearchResultResponse {
   products: any[];
+  isMockData?: boolean; // Track if the results are mock data
 }
 
 export interface PlatformInfo {
@@ -21,6 +22,7 @@ export interface PlatformInfo {
   color: string;
   baseUrl: string;
   searchUrl: string;
+  status?: 'online' | 'offline' | 'unknown';
 }
 
 export const PLATFORMS: Record<string, PlatformInfo> = {

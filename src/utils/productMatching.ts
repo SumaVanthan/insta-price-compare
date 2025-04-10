@@ -1,4 +1,3 @@
-
 import { ProductData } from '@/components/ProductCard';
 import { ScrapedResult } from './types';
 import { areProductsSimilar } from './stringComparison';
@@ -109,10 +108,13 @@ export function mergeProducts(
     
     console.log(`Processing product: ${product.name} from ${product.source}`);
     
+    // For mock data, reduce the similarity threshold to ensure we get products
+    const similarityThreshold = product.isMock ? 0.4 : 0.6;
+    
     // Find all similar products across all platforms
     const similarProducts = allProducts.filter(p => 
       !processedProducts.has(p.name) && 
-      (p === product || areProductsSimilar(p.name, product.name))
+      (p === product || areProductsSimilar(p.name, product.name, similarityThreshold))
     );
     
     console.log(`Found ${similarProducts.length} similar products for ${product.name}`);
@@ -200,51 +202,30 @@ function isProductProcessed(productName: string, processedNames: Set<string>): b
  * Fallback products to show when scraping fails
  */
 export function getFallbackProducts(query: string): ProductData[] {
-  console.log('Using fallback products for query:', query);
+  console.log(`Creating fallback product data for query: ${query}`);
   
-  // Instead of using hardcoded mock data, we'll redirect users to the actual sites
   return [
     {
-      id: '1',
-      name: `${query} - View on Zepto`,
-      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png',
+      id: 'fallback-1',
+      name: `Search for "${query}" on all platforms`,
+      imageUrl: '/placeholder.svg',
       prices: {
-        zepto: { 
-          price: 'Click to view', 
-          unit: 'Live price',
+        zepto: {
+          price: 'Click to view',
+          unit: '',
           url: `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`
-        }
-      },
-      unit: 'Search result',
-      sources: ['zepto']
-    },
-    {
-      id: '2',
-      name: `${query} - View on Blinkit`,
-      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png',
-      prices: {
-        blinkit: { 
-          price: 'Click to view', 
-          unit: 'Live price',
+        },
+        blinkit: {
+          price: 'Click to view',
+          unit: '',
           url: `https://blinkit.com/s/?q=${encodeURIComponent(query)}`
+        },
+        instamart: {
+          price: 'Click to view',
+          unit: '',
+          url: `https://www.swiggy.com/instamart/search?query=${encodeURIComponent(query)}`
         }
-      },
-      unit: 'Search result',
-      sources: ['blinkit']
-    },
-    {
-      id: '3',
-      name: `${query} - View on Swiggy Instamart`,
-      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg',
-      prices: {
-        instamart: { 
-          price: 'Click to view', 
-          unit: 'Live price',
-          url: `https://www.swiggy.com/instamart/search?custom_back=true&query=${encodeURIComponent(query)}`
-        }
-      },
-      unit: 'Search result',
-      sources: ['instamart']
+      }
     }
   ];
 }

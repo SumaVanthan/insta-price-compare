@@ -57,32 +57,35 @@ export class ProductScraper {
   /**
    * Get mock Zepto products for testing or when scraping fails
    */
-  private getMockZeptoProducts(query: string): ScrapedResult[] {
+  getMockZeptoProducts(query: string): ScrapedResult[] {
     console.log('[ProductScraper] Using mock Zepto products');
     return [
       {
-        name: "Daawat Basmati Rice - Super",
+        name: `Daawat Basmati Rice - Super (${query})`,
         price: "₹159",
         unit: "1 kg",
         url: `https://www.zeptonow.com/product/daawat-basmati-rice-super`,
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png",
-        source: "zepto"
+        source: "zepto",
+        isMock: true
       },
       {
-        name: "India Gate Basmati Rice - Classic",
+        name: `India Gate Basmati Rice - Classic (${query})`,
         price: "₹232",
         unit: "1 kg",
         url: `https://www.zeptonow.com/product/india-gate-basmati-rice-classic`,
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png",
-        source: "zepto"
+        source: "zepto",
+        isMock: true
       },
       {
-        name: "Fortune Everyday Basmati Rice",
+        name: `Fortune Everyday Basmati Rice (${query})`,
         price: "₹120",
         unit: "1 kg",
         url: `https://www.zeptonow.com/product/fortune-everyday-basmati-rice`,
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png",
-        source: "zepto"
+        source: "zepto",
+        isMock: true
       }
     ];
   }
@@ -90,32 +93,35 @@ export class ProductScraper {
   /**
    * Get mock Blinkit products for testing or when scraping fails
    */
-  private getMockBlinkitProducts(query: string): ScrapedResult[] {
+  getMockBlinkitProducts(query: string): ScrapedResult[] {
     console.log('[ProductScraper] Using mock Blinkit products');
     return [
       {
-        name: "Daawat Rozana Basmati Rice Gold",
+        name: `Daawat Rozana Basmati Rice Gold (${query})`,
         price: "₹423",
         unit: "5 kg",
         url: `https://blinkit.com/prn/daawat-rozana-basmati-rice-gold/prid/423`,
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png",
-        source: "blinkit"
+        source: "blinkit",
+        isMock: true
       },
       {
-        name: "India Gate Basmati Rice - Classic",
+        name: `India Gate Basmati Rice - Classic (${query})`,
         price: "₹235",
         unit: "1 kg",
         url: `https://blinkit.com/prn/india-gate-basmati-rice-classic/prid/235`,
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png",
-        source: "blinkit"
+        source: "blinkit",
+        isMock: true
       },
       {
-        name: "Fortune Everyday Basmati Rice",
+        name: `Fortune Everyday Basmati Rice (${query})`,
         price: "₹118",
         unit: "1 kg",
         url: `https://blinkit.com/prn/fortune-everyday-basmati-rice/prid/118`,
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png",
-        source: "blinkit"
+        source: "blinkit",
+        isMock: true
       }
     ];
   }
@@ -123,32 +129,35 @@ export class ProductScraper {
   /**
    * Get mock Instamart products for testing or when scraping fails
    */
-  private getMockInstamartProducts(query: string): ScrapedResult[] {
+  getMockInstamartProducts(query: string): ScrapedResult[] {
     console.log('[ProductScraper] Using mock Instamart products');
     return [
       {
-        name: "Daawat Basmati Rice - Super",
+        name: `Daawat Basmati Rice - Super (${query})`,
         price: "₹160",
         unit: "1 kg",
         url: `https://www.swiggy.com/instamart/product/daawat-basmati-rice-super`,
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg",
-        source: "instamart"
+        source: "instamart",
+        isMock: true
       },
       {
-        name: "India Gate Classic Basmati Rice",
+        name: `India Gate Classic Basmati Rice (${query})`,
         price: "₹230",
         unit: "1 kg",
         url: `https://www.swiggy.com/instamart/product/india-gate-classic-basmati-rice`,
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg",
-        source: "instamart"
+        source: "instamart",
+        isMock: true
       },
       {
-        name: "Fortune Basmati Rice",
+        name: `Fortune Basmati Rice (${query})`,
         price: "₹121",
         unit: "1 kg",
         url: `https://www.swiggy.com/instamart/product/fortune-basmati-rice`,
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg",
-        source: "instamart"
+        source: "instamart",
+        isMock: true
       }
     ];
   }
