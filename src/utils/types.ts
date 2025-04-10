@@ -45,3 +45,19 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
     searchUrl: 'https://www.swiggy.com/instamart/search?custom_back=true&query='
   }
 };
+
+// Helper function to get platform info by source name
+export function getPlatformInfo(source: string): PlatformInfo | undefined {
+  return PLATFORMS[source.toLowerCase()];
+}
+
+// Helper function to get all platforms as an array
+export function getAllPlatforms(): PlatformInfo[] {
+  return Object.values(PLATFORMS);
+}
+
+// Helper function to format source name for display
+export function formatSourceName(source: string): string {
+  const platform = getPlatformInfo(source);
+  return platform ? platform.name : source;
+}
