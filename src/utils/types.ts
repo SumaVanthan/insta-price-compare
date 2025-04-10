@@ -8,6 +8,7 @@ export interface ScrapedResult {
   source: string;
   searchQuery?: string;
   searchInfo?: string;
+  isMock?: boolean; // Added to track if this is mock data
 }
 
 export interface SearchResultResponse {

@@ -26,8 +26,8 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
         </footer>
         
-        {/* Backend Monitor (only shown in development) */}
-        {showBackendMonitor && !isMobile && <BackendMonitor />}
+        {/* Backend Monitor (always displayed for now to help debug) */}
+        {showBackendMonitor && <BackendMonitor />}
       </div>
     </SidebarProvider>
   );

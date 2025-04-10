@@ -45,17 +45,21 @@ export class ScraperClient {
     
     console.log(`[ScraperClient] Fetching ${url} with timeout ${this.timeout}ms`);
     
-    // For the preview environment where real network requests might fail,
-    // return cheerio-parsed mock HTML if we detect we're in a development/preview environment
-    if (this.isPreviewEnvironment()) {
-      console.log(`[ScraperClient] Preview environment detected for ${url}, using mock HTML`);
+    // Important: Only use mock data if specifically requested
+    // or if environment explicitly disallows real requests
+    const useMock = window.localStorage.getItem('use_mock_data') === 'true' || 
+                    this.isRestrictedEnvironment();
+    
+    if (useMock) {
+      console.log(`[ScraperClient] Using mock HTML for ${url} as configured`);
       const mockHtml = this.getMockHtmlForUrl(url);
       const $ = cheerio.load(mockHtml);
       this.saveToCache(url, $); // Cache the cheerio object
       return {
         success: true,
         data: $,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
+        error: "Used mock data as configured"
       };
     }
     
@@ -149,14 +153,11 @@ export class ScraperClient {
   }
   
   /**
-   * Check if we're in a preview/development environment
+   * Check if we're in an environment with restricted network capabilities
    */
-  private isPreviewEnvironment(): boolean {
-    return (
-      window.location.hostname === 'localhost' || 
-      window.location.hostname.includes('lovableproject.com') ||
-      window.location.hostname.includes('lovable.app')
-    );
+  private isRestrictedEnvironment(): boolean {
+    // Default to false - we'll try real requests by default
+    return false;
   }
   
   /**
