@@ -13,14 +13,16 @@ export class ScraperClient {
     'https://corsproxy.io/?',
     'https://api.allorigins.win/raw?url=',
     'https://proxy.cors.sh/',
-    'https://api.codetabs.com/v1/proxy?quest='
+    'https://api.codetabs.com/v1/proxy?quest=',
+    'https://thingproxy.freeboard.io/fetch/',
+    'https://cors-anywhere.herokuapp.com/',
   ];
   
   private cache: Map<string, {data: any, timestamp: number}> = new Map();
   private cacheTTL: number = 5 * 60 * 1000; // 5 minutes
   private proxyFailureCount: Map<string, number> = new Map(); // Track proxy reliability
   
-  constructor(private timeout: number = 10000) { // Increased default timeout to 10 seconds
+  constructor(private timeout: number = 15000) { // Increased default timeout to 15 seconds
     console.log(`[ScraperClient] Initialized with timeout: ${timeout}ms`);
     
     // Initialize proxy failure counts
@@ -45,13 +47,11 @@ export class ScraperClient {
     
     console.log(`[ScraperClient] Fetching ${url} with timeout ${this.timeout}ms`);
     
-    // Important: Only use mock data if specifically requested
-    // or if environment explicitly disallows real requests
-    const useMock = window.localStorage.getItem('use_mock_data') === 'true' || 
-                    this.isRestrictedEnvironment();
+    // Force real scraping unless mock data is explicitly requested
+    const forceMockData = localStorage.getItem('use_mock_data') === 'true';
     
-    if (useMock) {
-      console.log(`[ScraperClient] Using mock HTML for ${url} as configured`);
+    if (forceMockData) {
+      console.log(`[ScraperClient] Mock data explicitly requested for ${url}`);
       const mockHtml = this.getMockHtmlForUrl(url);
       const $ = cheerio.load(mockHtml);
       this.saveToCache(url, $); // Cache the cheerio object
@@ -91,9 +91,14 @@ export class ScraperClient {
               'Accept': 'text/html,application/xhtml+xml,application/xml',
               'Accept-Language': 'en-US,en;q=0.9',
               'Origin': window.location.origin,
-              'Referer': window.location.origin
+              'Referer': window.location.origin,
+              // Add cache busting parameter to avoid cached responses
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
             },
-            signal: AbortSignal.timeout(this.timeout)
+            signal: AbortSignal.timeout(this.timeout),
+            // Disable caching
+            cache: 'no-store'
           });
           
           if (!response.ok) {

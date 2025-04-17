@@ -7,25 +7,25 @@ class ScraperService {
   private scraper: ProductScraper;
   private cachedResults: Map<string, { timestamp: number, data: any }> = new Map();
   private cacheExpiration = 5 * 60 * 1000; // 5 minutes
-  private maxRetries = 2; // Maximum retry attempts
+  private maxRetries = 3; // Increased maximum retry attempts
   private retryDelay = 1000; // Delay between retries in milliseconds
   private lastNetworkErrorTime: number = 0;
   
   constructor() {
-    this.scraper = new ProductScraper(15000); // Increased timeout to 15 seconds
+    this.scraper = new ProductScraper(15000); // 15 seconds timeout
     console.log(`[ScraperService] Initialized with 15s timeout`);
   }
   
   async searchProducts(query: string, location: { latitude: number; longitude: number }) {
     console.log(`[ScraperService] Searching for "${query}" at location: ${location.latitude}, ${location.longitude}`);
     
-    // Check if mock data is requested
-    const useMockData = localStorage.getItem('use_mock_data') === 'true';
+    // Force real data unless mock is explicitly requested
+    const forceMockData = localStorage.getItem('use_mock_data') === 'true';
     
     // Check cache first (cache by query and location)
     const cacheKey = `search:${query}:${location.latitude}:${location.longitude}`;
     const cached = this.getCachedResult(cacheKey);
-    if (cached) {
+    if (cached && !forceMockData) {
       console.log('[ScraperService] Using cached search results');
       return cached;
     }
@@ -34,14 +34,14 @@ class ScraperService {
       console.log('[ScraperService] Starting parallel scraping of all sources...');
       
       // If mock data is explicitly requested, use it directly
-      if (useMockData) {
+      if (forceMockData) {
         console.log('[ScraperService] Mock data requested, using mock products');
         return this.getMockResults(query);
       }
       
       // Set up a global timeout for the entire search operation
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Search timed out after 20 seconds")), 20000);
+        setTimeout(() => reject(new Error("Search timed out after 30 seconds")), 30000);
       });
       
       // Scrape in parallel with better error handling
@@ -55,10 +55,11 @@ class ScraperService {
       const [zeptoProducts, blinkitProducts, instamartProducts] = await Promise.race([
         scrapingPromise,
         timeoutPromise.then(() => {
-          throw new Error("Search timed out after 20 seconds");
+          throw new Error("Search timed out after 30 seconds");
         })
       ]) as [ScrapedResult[], ScrapedResult[], ScrapedResult[]];
       
+      // Filter out mock data entries
       const realZeptoProducts = this.filterOutMockData(zeptoProducts, 'zepto');
       const realBlinkitProducts = this.filterOutMockData(blinkitProducts, 'blinkit');
       const realInstamartProducts = this.filterOutMockData(instamartProducts, 'instamart');
@@ -82,28 +83,36 @@ class ScraperService {
         if (now - this.lastNetworkErrorTime > 30000) {
           this.lastNetworkErrorTime = now;
           toast({
-            title: "Using mock results",
-            description: "Could not fetch real-time data. Showing mock results instead.",
+            title: "Using fallback results",
+            description: "Could not fetch real-time data. Try enabling 'Use Mock Data' in the monitor.",
             duration: 5000,
           });
         }
         
-        // If real products failed, use mock data as fallback
-        return this.getMockResults(query);
+        // If no real products, try using mock data as fallback
+        if (zeptoProducts.length === 0 && blinkitProducts.length === 0 && instamartProducts.length === 0) {
+          return this.getMockResults(query);
+        }
+        
+        // Otherwise use whatever we got (which might be mock data from the scrapers)
+        console.log('[ScraperService] No real products found, but using scraped results');
       }
       
       // Merge products and cache the result
       console.log('[ScraperService] Merging products from all sources...');
       const mergedProducts = mergeProducts(
-        realZeptoProducts,
-        realBlinkitProducts,
-        realInstamartProducts,
+        realZeptoProducts.length > 0 ? realZeptoProducts : zeptoProducts,
+        realBlinkitProducts.length > 0 ? realBlinkitProducts : blinkitProducts,
+        realInstamartProducts.length > 0 ? realInstamartProducts : instamartProducts,
         query
       );
       
       console.log(`[ScraperService] Final merged products count: ${mergedProducts.length}`);
       
-      const result = { products: mergedProducts };
+      const result = { 
+        products: mergedProducts,
+        isMockData: !anyRealProducts
+      };
       this.cacheResult(cacheKey, result);
       
       return result;
@@ -113,7 +122,7 @@ class ScraperService {
       // Show error toast to user
       toast({
         title: "Search Issues",
-        description: "Could not fetch results. Showing mock data instead.",
+        description: "Could not fetch results. Try enabling 'Use Mock Data' in the monitor.",
         variant: "destructive",
       });
       
