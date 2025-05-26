@@ -143,17 +143,12 @@ export class ScraperClient {
       }
     }
     
-    // If we've exhausted all options, try using mock HTML as last resort
-    console.log(`[ScraperClient] All fetch attempts failed for ${url}, using mock HTML as last resort`);
-    const mockHtml = this.getMockHtmlForUrl(url);
-    const $ = cheerio.load(mockHtml);
-    // Don't cache mock results to allow real fetch to be attempted next time
-    
+    // If we've exhausted all options, return a failure object
+    console.log(`[ScraperClient] All fetch attempts failed for ${url}`);
     return {
-      success: true,
-      data: $,
+      success: false,
+      error: "All fetch attempts failed to retrieve real data.",
       duration: Date.now() - startTime,
-      error: "Used mock data due to network issues"
     };
   }
   

@@ -3,10 +3,13 @@ import { ScrapedResult } from '../types';
 import { BaseScraper } from './baseScraper';
 
 export class BlinkitScraper extends BaseScraper {
-  async scrapeProducts(query: string): Promise<ScrapedResult[]> {
+  async scrapeProducts(query: string, location?: { latitude: number; longitude: number }): Promise<ScrapedResult[]> {
     try {
       console.log(`[BlinkitScraper] Scraping Blinkit for "${query}"...`);
-      const url = `https://blinkit.com/s/?q=${encodeURIComponent(query)}`;
+      let url = `https://blinkit.com/s/?q=${encodeURIComponent(query)}`;
+      if (location && location.latitude && location.longitude) {
+        url += `&lat=${location.latitude}&lon=${location.longitude}`;
+      }
       
       const result = await this.scraperClient.fetch(url);
       if (!result.success || !result.data) {
@@ -50,8 +53,8 @@ export class BlinkitScraper extends BaseScraper {
       }
       
       if (productElements.length === 0) {
-        console.log('[BlinkitScraper] No Blinkit products found, returning mock data');
-        return this.getFallbackProducts(query);
+        console.log('[BlinkitScraper] No Blinkit products found, returning empty array');
+        return [];
       }
       
       // Extract product information
@@ -127,41 +130,10 @@ export class BlinkitScraper extends BaseScraper {
       });
       
       console.log(`[BlinkitScraper] Successfully extracted ${products.length} Blinkit products`);
-      return products.length > 0 ? products : this.getFallbackProducts(query);
+      return products;
     } catch (error) {
       this.logError('Blinkit', error);
-      return this.getFallbackProducts(query);
+      return [];
     }
-  }
-  
-  // Implement the abstract method getFallbackProducts
-  getFallbackProducts(query: string): ScrapedResult[] {
-    console.log('[BlinkitScraper] Using mock Blinkit products');
-    return [
-      {
-        name: "Daawat Rozana Basmati Rice Gold",
-        price: "₹423",
-        unit: "5 kg",
-        url: `https://blinkit.com/prn/daawat-rozana-basmati-rice-gold/prid/423`,
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png",
-        source: "blinkit"
-      },
-      {
-        name: "India Gate Basmati Rice - Classic",
-        price: "₹235",
-        unit: "1 kg",
-        url: `https://blinkit.com/prn/india-gate-basmati-rice-classic/prid/235`,
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png",
-        source: "blinkit"
-      },
-      {
-        name: "Fortune Everyday Basmati Rice",
-        price: "₹118",
-        unit: "1 kg",
-        url: `https://blinkit.com/prn/fortune-everyday-basmati-rice/prid/118`,
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png",
-        source: "blinkit"
-      }
-    ];
   }
 }

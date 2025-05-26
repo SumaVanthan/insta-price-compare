@@ -1,8 +1,14 @@
-
+// backend/src/scrapers/instamartScraper.ts
 import { ScrapedResult } from '../types';
 import { BaseScraper } from './baseScraper';
+import { fetchHtml } from '../utils/httpClient';
+import * as cheerio from 'cheerio';
 
 export class InstamartScraper extends BaseScraper {
+  constructor() {
+    super(); // Call base constructor
+  }
+
   async scrapeProducts(query: string, location?: { latitude: number; longitude: number }): Promise<ScrapedResult[]> {
     try {
       console.log(`[InstamartScraper] Scraping Instamart for "${query}"...`);
@@ -11,15 +17,14 @@ export class InstamartScraper extends BaseScraper {
         url += `&lat=${location.latitude}&lon=${location.longitude}`;
       }
       
-      const result = await this.scraperClient.fetch(url);
-      if (!result.success || !result.data) {
-        throw new Error(`Failed to fetch Instamart data: ${result.error}`);
+      const fetchAttempt = await fetchHtml(url);
+      if (!fetchAttempt.success || !fetchAttempt.data) {
+        throw new Error(`Failed to fetch Instamart data: ${fetchAttempt.error}`);
       }
       
-      const $ = result.data;
-      console.log(`[InstamartScraper] Successfully fetched Instamart HTML`);
+      const $ = cheerio.load(fetchAttempt.data);
+      console.log(`[InstamartScraper] Successfully fetched and parsed Instamart HTML`);
       
-      // Selectors for product elements
       const productSelectors = [
         '[class*="ProductCard"]', 
         '[class*="product-card"]', 
@@ -29,7 +34,6 @@ export class InstamartScraper extends BaseScraper {
       
       let productElements: any[] = [];
       
-      // Try each selector until we find products
       for (const selector of productSelectors) {
         const elements = $(selector).toArray();
         if (elements.length > 0) {
@@ -39,13 +43,11 @@ export class InstamartScraper extends BaseScraper {
         }
       }
       
-      // If no products found with specific selectors, try a more generic approach
       if (productElements.length === 0) {
         console.log('[InstamartScraper] No products found with specific selectors, trying generic approach');
         const allDivs = $('div').toArray();
         productElements = allDivs.filter(el => {
           const html = $(el).html() || '';
-          // Look for divs that likely contain product info
           return (html.includes('price') || html.includes('₹') || html.includes('rs')) && 
                  (html.includes('kg') || html.includes('g') || html.includes('ml') || html.includes('l'));
         });
@@ -57,14 +59,12 @@ export class InstamartScraper extends BaseScraper {
         return [];
       }
       
-      // Extract product information
       const products: ScrapedResult[] = [];
       
       productElements.forEach((el, index) => {
         try {
           const $el = $(el);
           
-          // Extract product name
           let name = '';
           const nameSelectors = ['h3', 'h2', '[class*="name"]', '[class*="title"]'];
           for (const selector of nameSelectors) {
@@ -75,7 +75,6 @@ export class InstamartScraper extends BaseScraper {
             }
           }
           
-          // Extract product price
           let price = '';
           const priceSelectors = ['[class*="price"]', '[class*="amount"]'];
           for (const selector of priceSelectors) {
@@ -86,7 +85,6 @@ export class InstamartScraper extends BaseScraper {
             }
           }
           
-          // Extract product unit/quantity
           let unit = '';
           const unitSelectors = ['[class*="weight"]', '[class*="quantity"]', '[class*="unit"]'];
           for (const selector of unitSelectors) {
@@ -97,17 +95,15 @@ export class InstamartScraper extends BaseScraper {
             }
           }
           
-          // Extract product URL
-          let url = '';
+          let productUrl = ''; // Renamed to avoid conflict with outer scope 'url'
           const anchor = $el.find('a').first();
           if (anchor.length) {
             const href = anchor.attr('href');
             if (href) {
-              url = href.startsWith('http') ? href : `https://www.swiggy.com${href.startsWith('/') ? '' : '/'}${href}`;
+              productUrl = href.startsWith('http') ? href : `https://www.swiggy.com${href.startsWith('/') ? '' : '/'}${href}`;
             }
           }
           
-          // Extract image URL
           let imageUrl = '';
           const img = $el.find('img').first();
           if (img.length) {
@@ -119,7 +115,7 @@ export class InstamartScraper extends BaseScraper {
               name: name || `Instamart Product ${index + 1}`,
               price: price || 'Price not available',
               unit: unit || '',
-              url: url || `https://www.swiggy.com/instamart/search?query=${encodeURIComponent(query)}`,
+              url: productUrl || `https://www.swiggy.com/instamart/search?query=${encodeURIComponent(query)}`,
               imageUrl: imageUrl || 'https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg',
               source: 'instamart'
             });
@@ -135,5 +131,10 @@ export class InstamartScraper extends BaseScraper {
       this.logError('Instamart', error);
       return [];
     }
+  }
+
+  getFallbackProducts(query: string): ScrapedResult[] {
+    console.log('[InstamartScraper] Fallback requested but returning empty array as per backend logic.');
+    return [];
   }
 }

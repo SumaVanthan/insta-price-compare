@@ -1,57 +1,86 @@
 
-import { ProductData } from '@/components/ProductCard';
-import { SearchResultResponse } from './types';
-import { extractPrice } from './priceUtils';
-import { scraperService } from './scraping/ScraperService';
+import { ProductData, SearchPageResponse, BackendSearchResponse, BackendProduct } from './types'; // Adjusted imports
+// Removed scraperService import
+// extractPrice might not be needed here if backend provides all price details
 
 /**
- * Search for products across multiple platforms
+ * Search for products across multiple platforms by calling the backend API
  * @param query Search query
  * @param location User's location
- * @returns List of products with prices from different platforms
+ * @returns Formatted product data for the frontend
  */
 export const searchProducts = async (
   query: string,
   location: { latitude: number; longitude: number }
-): Promise<SearchResultResponse> => {
-  console.log(`[API] Searching for "${query}" at location: ${location.latitude}, ${location.longitude}`);
-  
+): Promise<SearchPageResponse> => {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  const apiUrl = `${backendUrl}/api/search?query=${encodeURIComponent(query)}&lat=${location.latitude}&lon=${location.longitude}`;
+
+  console.log(`[API] Calling backend API: ${apiUrl}`);
   try {
-    // Delegate to the scraper service with proper error handling
-    console.time('[API] Search execution time');
-    const results = await scraperService.searchProducts(query, location);
-    console.timeEnd('[API] Search execution time');
+    const response = await fetch(apiUrl);
     
-    console.log(`[API] Found ${results.products.length} products for query "${query}"`);
-    
-    // Log product sources summary
-    const sourceCount = {
-      zepto: 0,
-      blinkit: 0,
-      instamart: 0,
-      mixed: 0
-    };
-    
-    results.products.forEach(product => {
-      if (product.sources) {
-        if (product.sources.length > 1) {
-          sourceCount.mixed++;
-        } else if (product.sources.includes('zepto')) {
-          sourceCount.zepto++;
-        } else if (product.sources.includes('blinkit')) {
-          sourceCount.blinkit++;
-        } else if (product.sources.includes('instamart')) {
-          sourceCount.instamart++;
+    if (!response.ok) {
+      let errorMsg = `HTTP error! status: ${response.status}`;
+      try {
+        const errorResult: BackendSearchResponse = await response.json();
+        if (errorResult.error && errorResult.error.message) {
+          errorMsg = errorResult.error.message;
+        } else if (errorResult.message) {
+          errorMsg = errorResult.message;
         }
+      } catch (e) {
+        // Could not parse error JSON, use default HTTP error
+        console.error('[API] Could not parse error JSON from backend', e);
       }
+      console.error(`[API] Backend request failed: ${errorMsg}`);
+      return { products: [], error: errorMsg, metadata: undefined };
+    }
+
+    const result: BackendSearchResponse = await response.json();
+
+    if (!result.success) {
+      const errorMsg = result.error?.message || result.message || 'Backend indicated failure.';
+      console.error(`[API] Backend returned success=false: ${errorMsg}`);
+      return { products: [], error: errorMsg, metadata: result.metadata };
+    }
+
+    if (!result.products || result.products.length === 0) {
+      console.log('[API] No products found or returned from backend.');
+      return { products: [], message: result.message || 'No products found.', metadata: result.metadata };
+    }
+
+    // Map BackendProduct[] to ProductData[]
+    const mappedProducts: ProductData[] = result.products.map((p: BackendProduct): ProductData => {
+      const sources: string[] = [];
+      if (p.prices.zepto) sources.push('zepto');
+      if (p.prices.blinkit) sources.push('blinkit');
+      if (p.prices.instamart) sources.push('instamart');
+
+      // The PriceDetail interface is compatible with BackendPlatformPriceDetail
+      // as per the definitions in types.ts (Turn 43 for PriceDetail, Turn 42 for BackendPlatformPriceDetail)
+      return {
+        id: p.id,
+        name: p.name,
+        imageUrl: p.imageUrl || '/placeholder.svg',
+        prices: { 
+          zepto: p.prices.zepto,
+          blinkit: p.prices.blinkit,
+          instamart: p.prices.instamart,
+        },
+        sources: sources,
+        // unit: p.unit, // BackendProduct does not have a top-level unit.
+                       // ProductData's top-level unit will be derived by ProductCard if needed,
+                       // or this mapping could try to find a common one.
+      };
     });
     
-    console.log('[API] Product sources breakdown:', sourceCount);
-    
-    return results;
-  } catch (error) {
-    console.error('[API] Search error:', error);
-    throw error;
+    console.log(`[API] Successfully fetched and mapped ${mappedProducts.length} products.`);
+    return { products: mappedProducts, error: null, message: null, metadata: result.metadata };
+
+  } catch (error: any) {
+    console.error('[API] Network or unexpected error calling backend:', error);
+    return { products: [], error: error.message || 'Failed to connect to the backend.', metadata: undefined };
   }
 };
 

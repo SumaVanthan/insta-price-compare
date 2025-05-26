@@ -86,25 +86,34 @@ const Index = () => {
       const result = await searchProducts(query, location);
       
       if (isLoading) { // Make sure we're still in loading state (not cancelled)
-        setProducts(result.products);
-        console.log(`Search completed with ${result.products.length} products`);
-        
-        // Extract search metadata from products if available
-        const zeptoInfo = result.products.find(p => p.source === 'zepto' && p.searchInfo)?.searchInfo || '';
-        const blinkitInfo = result.products.find(p => p.source === 'blinkit' && p.searchInfo)?.searchInfo || '';
-        const instamartInfo = result.products.find(p => p.source === 'instamart' && p.searchInfo)?.searchInfo || '';
-        
-        setSearchMetadata({
-          zepto: zeptoInfo || `Searched for "${query}" on Zepto`,
-          blinkit: blinkitInfo || `Searched for "${query}" on Blinkit`,
-          instamart: instamartInfo || `Searched for "${query}" on Instamart`
-        });
-        
-        if (result.products.length === 0) {
+        if (result.error) {
+          setError(result.error);
+          setProducts([]);
+          // The toast in the catch block will handle unexpected errors.
+          // If result.error is present, ErrorState component will display it.
+        } else if (result.products && result.products.length === 0) {
+          setProducts([]);
+          // Existing toast for "No products found" is fine.
+          // Consider using result.message for a more specific message if needed in the future.
+          setSearchMetadata({ zepto: '', blinkit: '', instamart: '' }); // Clear metadata
           toast({
             title: "No products found",
-            description: "Try a different search term or check back later.",
+            description: result.message || "Try a different search term or check back later.",
             duration: 3000,
+          });
+        } else if (result.products) {
+          setProducts(result.products);
+          console.log(`Search completed with ${result.products.length} products`);
+          
+          // Extract search metadata from products if available
+          const zeptoInfo = result.products.find(p => p.source === 'zepto' && p.searchInfo)?.searchInfo || '';
+          const blinkitInfo = result.products.find(p => p.source === 'blinkit' && p.searchInfo)?.searchInfo || '';
+          const instamartInfo = result.products.find(p => p.source === 'instamart' && p.searchInfo)?.searchInfo || '';
+          
+          setSearchMetadata({
+            zepto: zeptoInfo || `Searched for "${query}" on Zepto`,
+            blinkit: blinkitInfo || `Searched for "${query}" on Blinkit`,
+            instamart: instamartInfo || `Searched for "${query}" on Instamart`
           });
         }
       }
@@ -114,9 +123,10 @@ const Index = () => {
         console.error(`Search error: ${errorMessage}`);
         
         setError(errorMessage);
+        setProducts([]); // Ensure products are cleared on catch
         toast({
           title: "Search failed",
-          description: errorMessage,
+          description: "An unexpected error occurred. Please try again.", // Generic message for catch
           variant: "destructive",
           duration: 3000,
         });
@@ -129,8 +139,10 @@ const Index = () => {
   const retrySearch = () => {
     if (currentQuery) {
       handleSearch(currentQuery);
-    } else if (hasSearched) {
+    } else if (hasSearched && !error) { // Only auto-retry 'milk' if there wasn't a specific error from last search
       handleSearch('milk');
+    } else if (error && currentQuery) { // If there was an error, retry the same query
+      handleSearch(currentQuery);
     }
   };
 
@@ -239,7 +251,7 @@ const Index = () => {
               className="py-12 text-center"
             >
               <h3 className="text-xl font-medium mb-2">No products found</h3>
-              <p className="text-muted-foreground">Try a different search term or check back later.</p>
+            <p className="text-muted-foreground">{error ? error : "Try a different search term or check back later."}</p>
             </motion.div>
           ) : (
             <ProductGrid key="results" products={products} />

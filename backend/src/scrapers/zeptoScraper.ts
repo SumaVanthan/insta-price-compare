@@ -1,8 +1,14 @@
-
+// backend/src/scrapers/zeptoScraper.ts
 import { ScrapedResult } from '../types';
 import { BaseScraper } from './baseScraper';
+import { fetchHtml } from '../utils/httpClient';
+import * as cheerio from 'cheerio';
 
 export class ZeptoScraper extends BaseScraper {
+  constructor() {
+    super(); // Call base constructor
+  }
+
   async scrapeProducts(query: string, location?: { latitude: number; longitude: number }): Promise<ScrapedResult[]> {
     try {
       console.log(`[ZeptoScraper] Scraping Zepto for "${query}"...`);
@@ -11,31 +17,22 @@ export class ZeptoScraper extends BaseScraper {
         url += `&lat=${location.latitude}&lon=${location.longitude}`;
       }
       
-      const result = await this.scraperClient.fetch(url);
-      if (!result.success || !result.data) {
-        throw new Error(`Failed to fetch Zepto data: ${result.error}`);
+      const fetchAttempt = await fetchHtml(url);
+      if (!fetchAttempt.success || !fetchAttempt.data) {
+        throw new Error(`Failed to fetch Zepto data: ${fetchAttempt.error}`);
       }
       
-      // Check if we got mock data due to network issues
-      if (result.error && result.error.includes('mock data')) {
-        console.log(`[ZeptoScraper] Received mock data due to network issues`);
-        throw new Error('Network error: Unable to fetch real data');
-      }
+      const $ = cheerio.load(fetchAttempt.data);
+      console.log(`[ZeptoScraper] Successfully fetched and parsed Zepto HTML`);
       
-      const $ = result.data;
-      console.log(`[ZeptoScraper] Successfully fetched Zepto HTML`);
-      
-      // Get search info - try to find the search info on the page
       let searchInfo = '';
       try {
-        // Different selectors that might contain search information
         const searchInfoSelectors = [
           '.search-info', 
           '.search-term', 
           '[class*="SearchInfo"]',
           '.search-results-header'
         ];
-        
         for (const selector of searchInfoSelectors) {
           const text = $(selector).first().text().trim();
           if (text) {
@@ -43,27 +40,21 @@ export class ZeptoScraper extends BaseScraper {
             break;
           }
         }
-        
-        // If no specific selector found, try to extract from page title
         if (!searchInfo) {
           const title = $('title').text().trim();
           if (title.includes(query)) {
             searchInfo = `Search for "${query}" on Zepto`;
           }
         }
-        
-        // Fallback
         if (!searchInfo) {
           searchInfo = `Showing results for "${query}" on Zepto`;
         }
-        
         console.log(`[ZeptoScraper] Search info: ${searchInfo}`);
       } catch (err) {
         console.error('[ZeptoScraper] Error extracting search info:', err);
         searchInfo = `Searched for "${query}" on Zepto`;
       }
       
-      // Selectors for product elements
       const productSelectors = [
         'div[data-testid="product-card"]', 
         '[class*="ProductCard"]', 
@@ -75,7 +66,6 @@ export class ZeptoScraper extends BaseScraper {
       
       let productElements: any[] = [];
       
-      // Try each selector until we find products
       for (const selector of productSelectors) {
         const elements = $(selector).toArray();
         if (elements.length > 0) {
@@ -85,13 +75,11 @@ export class ZeptoScraper extends BaseScraper {
         }
       }
       
-      // If no products found with specific selectors, try a more generic approach
       if (productElements.length === 0) {
         console.log('[ZeptoScraper] No products found with specific selectors, trying generic approach');
         const allDivs = $('div').toArray();
         productElements = allDivs.filter(el => {
           const html = $(el).html() || '';
-          // Look for divs that likely contain product info
           return (html.includes('price') || html.includes('₹') || html.includes('rs')) && 
                  (html.includes('kg') || html.includes('g') || html.includes('ml') || html.includes('l'));
         });
@@ -103,14 +91,12 @@ export class ZeptoScraper extends BaseScraper {
         return [];
       }
       
-      // Extract product information
       const products: ScrapedResult[] = [];
       
       productElements.forEach((el, index) => {
         try {
           const $el = $(el);
           
-          // Extract product name
           let name = '';
           const nameSelectors = ['h3', 'h2', '[class*="name"]', '[class*="title"]'];
           for (const selector of nameSelectors) {
@@ -121,7 +107,6 @@ export class ZeptoScraper extends BaseScraper {
             }
           }
           
-          // Extract product price
           let price = '';
           const priceSelectors = ['[class*="price"]', '[class*="amount"]'];
           for (const selector of priceSelectors) {
@@ -132,7 +117,6 @@ export class ZeptoScraper extends BaseScraper {
             }
           }
           
-          // Extract product unit/quantity
           let unit = '';
           const unitSelectors = ['[class*="weight"]', '[class*="quantity"]', '[class*="unit"]'];
           for (const selector of unitSelectors) {
@@ -143,17 +127,15 @@ export class ZeptoScraper extends BaseScraper {
             }
           }
           
-          // Extract product URL
-          let url = '';
+          let productUrl = ''; // Renamed
           const anchor = $el.find('a').first();
           if (anchor.length) {
             const href = anchor.attr('href');
             if (href) {
-              url = href.startsWith('http') ? href : `https://www.zeptonow.com${href.startsWith('/') ? '' : '/'}${href}`;
+              productUrl = href.startsWith('http') ? href : `https://www.zeptonow.com${href.startsWith('/') ? '' : '/'}${href}`;
             }
           }
           
-          // Extract image URL
           let imageUrl = '';
           const img = $el.find('img').first();
           if (img.length) {
@@ -165,11 +147,11 @@ export class ZeptoScraper extends BaseScraper {
               name: name,
               price: price,
               unit: unit || '',
-              url: url || `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`,
+              url: productUrl || `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`,
               imageUrl: imageUrl || '',
               source: 'zepto',
-              searchQuery: query, // Add the search query
-              searchInfo: searchInfo // Add search info from the page
+              searchQuery: query,
+              searchInfo: searchInfo
             });
           }
         } catch (err) {
@@ -184,11 +166,9 @@ export class ZeptoScraper extends BaseScraper {
       return [];
     }
   }
-  
-  // Implement the abstract method getFallbackProducts
+
   getFallbackProducts(query: string): ScrapedResult[] {
-    // We don't want to show mock data to users anymore
-    console.log('[ZeptoScraper] Fallback requested but returning empty array as mock data is disabled');
+    console.log('[ZeptoScraper] Fallback requested but returning empty array as per backend logic.');
     return [];
   }
 }

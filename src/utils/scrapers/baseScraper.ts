@@ -10,7 +10,7 @@ export abstract class BaseScraper {
     this.scraperClient = new ScraperClient(timeout);
   }
   
-  abstract scrapeProducts(query: string): Promise<ScrapedResult[]>;
+  abstract scrapeProducts(query: string, location?: { latitude: number; longitude: number }): Promise<ScrapedResult[]>;
   abstract getFallbackProducts(query: string): ScrapedResult[];
   
   protected logError(platform: string, error: any): void {

@@ -46,9 +46,9 @@ class ScraperService {
       
       // Scrape in parallel with better error handling
       const scrapingPromise = Promise.all([
-        this.scrapeWithRetry(() => this.scraper.scrapeZeptoProducts(query), 'Zepto'),
-        this.scrapeWithRetry(() => this.scraper.scrapeBlinkitProducts(query), 'Blinkit'),
-        this.scrapeWithRetry(() => this.scraper.scrapeInstamartProducts(query), 'Instamart')
+        this.scrapeWithRetry(() => this.scraper.scrapeZeptoProducts(query, location), 'Zepto'),
+        this.scrapeWithRetry(() => this.scraper.scrapeBlinkitProducts(query, location), 'Blinkit'),
+        this.scrapeWithRetry(() => this.scraper.scrapeInstamartProducts(query, location), 'Instamart')
       ]);
       
       // Race between successful scraping and timeout
@@ -76,34 +76,32 @@ class ScraperService {
         anyRealProducts
       });
       
-      // If no real products found from any source, show appropriate message and use mock data
+      // If no real products found from any source, show appropriate message
       if (!anyRealProducts) {
+        console.log('[ScraperService] No real products found from any source.');
         // Rate limit network error messages (only show once every 30 seconds)
         const now = Date.now();
         if (now - this.lastNetworkErrorTime > 30000) {
           this.lastNetworkErrorTime = now;
           toast({
-            title: "Using fallback results",
-            description: "Could not fetch real-time data. Try enabling 'Use Mock Data' in the monitor.",
+            title: "Search Results", // Or "Data Retrieval Issue"
+            description: "Could not fetch real-time data for some products. Please try again later.",
             duration: 5000,
           });
         }
-        
-        // If no real products, try using mock data as fallback
-        if (zeptoProducts.length === 0 && blinkitProducts.length === 0 && instamartProducts.length === 0) {
-          return this.getMockResults(query);
-        }
-        
-        // Otherwise use whatever we got (which might be mock data from the scrapers)
-        console.log('[ScraperService] No real products found, but using scraped results');
+        return {
+          products: [],
+          isMockData: false,
+          message: "No products found or real-time data could not be retrieved."
+        };
       }
       
       // Merge products and cache the result
       console.log('[ScraperService] Merging products from all sources...');
       const mergedProducts = mergeProducts(
-        realZeptoProducts.length > 0 ? realZeptoProducts : zeptoProducts,
-        realBlinkitProducts.length > 0 ? realBlinkitProducts : blinkitProducts,
-        realInstamartProducts.length > 0 ? realInstamartProducts : instamartProducts,
+        realZeptoProducts, // Use only real products for merging
+        realBlinkitProducts,
+        realInstamartProducts,
         query
       );
       
@@ -111,7 +109,7 @@ class ScraperService {
       
       const result = { 
         products: mergedProducts,
-        isMockData: !anyRealProducts
+        isMockData: false // Since we only use real products or return empty
       };
       this.cacheResult(cacheKey, result);
       
@@ -126,8 +124,12 @@ class ScraperService {
         variant: "destructive",
       });
       
-      // Return mock results as fallback
-      return this.getMockResults(query);
+      // Return an object indicating failure
+      return {
+        products: [],
+        isMockData: false,
+        error: `Search operation failed: ${error.message || error}`
+      };
     }
   }
   
@@ -137,10 +139,63 @@ class ScraperService {
   private getMockResults(query: string) {
     console.log('[ScraperService] Using mock results for all platforms');
     
-    // Get mock data from all platforms
-    const zeptoProducts = this.scraper.getMockZeptoProducts(query);
-    const blinkitProducts = this.scraper.getMockBlinkitProducts(query);
-    const instamartProducts = this.scraper.getMockInstamartProducts(query);
+    // Generate mock data directly within this service
+    const zeptoProducts: ScrapedResult[] = [
+      {
+        name: `Mock Zepto Product 1 (${query})`,
+        price: "₹100",
+        unit: "1 pc",
+        url: `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png",
+        source: "zepto"
+      },
+      {
+        name: `Mock Zepto Product 2 (${query})`,
+        price: "₹250",
+        unit: "500 g",
+        url: `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Zepto_Logo.png",
+        source: "zepto"
+      }
+    ];
+
+    const blinkitProducts: ScrapedResult[] = [
+      {
+        name: `Mock Blinkit Item A (${query})`,
+        price: "₹120",
+        unit: "1 L",
+        url: `https://blinkit.com/s/?q=${encodeURIComponent(query)}`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png",
+        source: "blinkit"
+      },
+      {
+        name: `Mock Blinkit Item B (${query})`,
+        price: "₹300",
+        unit: "6 pack",
+        url: `https://blinkit.com/s/?q=${encodeURIComponent(query)}`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/13/Blinkit-yellow-app-icon.png",
+        source: "blinkit"
+      }
+    ];
+
+    const instamartProducts: ScrapedResult[] = [
+      {
+        name: `Mock Instamart Special (${query})`,
+        price: "₹90",
+        unit: "250 g",
+        url: `https://www.swiggy.com/instamart/search?query=${encodeURIComponent(query)}`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg",
+        source: "instamart"
+      },
+      {
+        name: `Mock Instamart Value (${query})`,
+        price: "₹180",
+        unit: "1 dozen",
+        url: `https://www.swiggy.com/instamart/search?query=${encodeURIComponent(query)}`,
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/94/Swiggy_logo.svg",
+        source: "instamart"
+      }
+    ];
     
     // Mark all products as mock data
     zeptoProducts.forEach(p => p.isMock = true);
